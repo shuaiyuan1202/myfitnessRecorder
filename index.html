@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="fittrack">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FitTrack</title>
+  
+  <!-- Tailwind & DaisyUI -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {},
+      },
+      daisyui: {
+        themes: [
+          {
+            fittrack: {
+              "primary": "#6366f1",
+              "secondary": "#ec4899",
+              "accent": "#8b5cf6",
+              "neutral": "#1f2937",
+              "base-100": "#ffffff",
+              "base-200": "#f3f4f6",
+              "base-300": "#e5e7eb",
+              "info": "#3abff8",
+              "success": "#36d399",
+              "warning": "#fbbd23",
+              "error": "#f87272",
+              "--rounded-box": "1rem",
+              "--rounded-btn": "0.8rem",
+              "--rounded-badge": "1.9rem",
+              "--animation-btn": "0.25s",
+              "--animation-input": "0.2s",
+              "--btn-focus-scale": "0.95",
+              "--border-btn": "1px",
+              "--tab-border": "1px",
+              "--tab-radius": "0.5rem",
+            },
+          },
+          "light",
+          "dark",
+        ],
+      },
+    }
+  </script>
+
+  <!-- Libraries -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/vue-demi"></script>
+  <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+  <script src="https://unpkg.com/pinia@2/dist/pinia.iife.js"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+  <style>
+    /* Global Styles & Animations */
+    .animate-bounce-slow { animation: bounce 3s infinite; }
+    .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+      50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-base-200/50 min-h-screen">
+  <div id="app">
+    <router-view></router-view>
+  </div>
+
+  <!-- TEMPLATE: Login -->
+  <script type="text/x-template" id="login-template">
+    <div class="min-h-screen flex flex-col items-center justify-center bg-base-100 p-6 relative overflow-hidden">
+        <!-- Decorative blobs -->
+        <div class="absolute top-[-10%] right-[-10%] w-64 h-64 bg-primary/20 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-secondary/20 rounded-full blur-3xl"></div>
+    
+        <div class="w-full max-w-sm z-10">
+          <div class="text-center mb-10">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-primary to-accent shadow-lg shadow-primary/30 text-4xl mb-6">
+              💪
+            </div>
+            <h1 class="text-4xl font-black text-base-content mb-2 tracking-tight">FitTrack</h1>
+            <p class="text-base-content/60 font-medium">欢迎回来，运动健将！</p>
+          </div>
+          
+          <div class="space-y-4">
+            <div class="form-control w-full">
+              <input 
+                type="text" 
+                v-model="username" 
+                placeholder="用户名" 
+                class="input input-lg input-bordered w-full bg-base-200/50 border-none focus:ring-2 focus:ring-primary/50 focus:bg-base-100 transition-all rounded-2xl font-medium placeholder:text-base-content/30" 
+              />
+            </div>
+            
+            <div class="form-control w-full">
+              <input 
+                type="password" 
+                v-model="password" 
+                placeholder="密码" 
+                class="input input-lg input-bordered w-full bg-base-200/50 border-none focus:ring-2 focus:ring-primary/50 focus:bg-base-100 transition-all rounded-2xl font-medium placeholder:text-base-content/30" 
+                @keyup.enter="handleLogin" 
+              />
+            </div>
+            
+            <button 
+              class="btn btn-primary btn-lg w-full rounded-2xl font-bold shadow-xl shadow-primary/30 mt-4 h-14" 
+              @click="handleLogin" 
+              :disabled="loading"
+            >
+              <span v-if="loading" class="loading loading-spinner"></span>
+              {{ loading ? '登录中...' : '登录' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div v-if="error" class="toast toast-top toast-center z-50">
+            <div class="alert alert-error text-white shadow-lg rounded-2xl">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>{{ error }}</span>
+            </div>
+        </div>
+      </div>
+  </script>
+
+  <!-- TEMPLATE: Dashboard -->
+  <script type="text/x-template" id="dashboard-template">
+    <div class="min-h-screen bg-base-200/50 pb-24 font-sans">
+        <!-- Header -->
+        <header class="pt-8 px-6 pb-6 bg-base-100 rounded-b-[2.5rem] shadow-sm mb-6">
+           <div class="flex justify-between items-center mb-6">
+             <div>
+               <p class="text-sm text-base-content/60 font-medium">你好，</p>
+               <h1 class="text-2xl font-black text-base-content">{{ authStore.userConfig?.username[0].text || 'Athlete' }}</h1>
+             </div>
+             <div class="dropdown dropdown-end">
+                <div tabindex="0" role="button" class="btn btn-circle btn-ghost bg-base-200 hover:bg-base-300 border-none shadow-sm">
+                   <span class="text-xl font-bold text-primary">{{ userInitial }}</span>
+                </div>
+                <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100 rounded-2xl w-40 border border-base-200">
+                  <li><a @click="logout" class="text-error font-medium">退出登录</a></li>
+                </ul>
+             </div>
+           </div>
+    
+           <!-- Main Stats Card -->
+           <div class="bg-primary text-primary-content rounded-[2rem] p-6 shadow-xl shadow-primary/30 relative overflow-hidden">
+             <!-- Background Patterns -->
+             <div class="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+             <div class="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
+             
+             <div class="flex justify-between items-end relative z-10">
+                <div>
+                    <div class="text-primary-content/80 text-sm font-medium mb-1">今日消耗</div>
+                    <div class="text-5xl font-black tracking-tight">{{ todayKcal }}</div>
+                    <div class="text-primary-content/60 text-xs mt-2 font-medium">卡路里</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-3xl font-bold">{{ todaySets }}</div>
+                    <div class="text-primary-content/80 text-xs font-medium uppercase tracking-wide">运动组数</div>
+                </div>
+             </div>
+           </div>
+        </header>
+    
+        <!-- Quick Actions -->
+        <div class="px-6 mb-8">
+           <div class="flex items-center justify-between mb-4">
+             <h3 class="font-bold text-lg text-base-content/90">快速记录</h3>
+             <button class="btn btn-xs btn-ghost text-primary">编辑</button>
+           </div>
+           
+           <div class="grid grid-cols-3 gap-4">
+              <button 
+                 v-for="action in actions" 
+                 :key="action.id"
+                 @click="openModal(action)"
+                 class="flex flex-col items-center justify-center gap-3 p-4 bg-base-100 rounded-3xl shadow-sm border border-base-100 hover:border-primary/30 hover:shadow-md active:scale-95 transition-all group h-32"
+              >
+                 <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-transform group-hover:-translate-y-1" :class="action.color">
+                    {{ action.icon }}
+                 </div>
+                 <span class="text-xs font-bold text-base-content/70 group-hover:text-primary transition-colors">{{ action.name }}</span>
+              </button>
+           </div>
+        </div>
+    
+        <!-- History -->
+        <div class="px-6">
+           <h3 class="font-bold text-lg text-base-content/90 mb-4">今日记录</h3>
+           
+           <div class="relative border-l-2 border-base-300 space-y-8">
+              <!-- Loading Skeleton -->
+              <div v-if="initLoading" class="pl-6 space-y-4">
+                  <div class="h-20 bg-base-100 rounded-2xl animate-pulse"></div>
+                  <div class="h-20 bg-base-100 rounded-2xl animate-pulse opacity-60"></div>
+                  <div class="h-20 bg-base-100 rounded-2xl animate-pulse opacity-30"></div>
+              </div>
+
+              <!-- Empty State -->
+              <div v-else-if="history.length === 0" class="pl-6 py-8 text-center text-base-content/40 italic">
+                 暂无运动记录，快去动起来吧！
+              </div>
+              
+              <!-- List -->
+              <div 
+                 v-else
+                 v-for="(record, index) in history.slice(0, 10)" 
+                 :key="record.id"
+                 class="relative pl-6 group"
+              >
+                 <!-- Timeline Dot -->
+                 <div class="absolute -left-[7px] top-6 w-4 h-4 rounded-full border-2 border-base-100" :class="index === 0 ? 'bg-primary ring-4 ring-primary/20' : 'bg-base-300'"></div>
+                 
+                 <!-- Content -->
+                 <div class="bg-base-100 p-4 rounded-2xl shadow-sm border border-base-100 flex justify-between items-center transition-transform">
+                    <div class="flex items-center gap-3">
+                       <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center text-xl">
+                          {{ getIcon(record.actionType) }}
+                       </div>
+                       <div>
+                          <div class="font-bold text-base-content">{{ record.actionType }}</div>
+                          <div class="text-xs text-base-content/50 font-medium">{{ formatTime(record.date) }}</div>
+                       </div>
+                    </div>
+                    
+                    <div class="text-right pr-6">
+                       <div class="font-black text-lg text-base-content">{{ record.count }} <span class="text-xs font-medium text-base-content/40">次</span></div>
+                       <div class="text-xs font-bold text-primary">{{ record.kcal }} kcal</div>
+                    </div>
+    
+                    <!-- Delete Button -->
+                    <button 
+                       @click.stop="deleteRecord(record.id)"
+                       class="btn btn-ghost btn-xs text-error absolute -right-0 top-1/2 -translate-y-1/2"
+                    >
+                       <span v-if="deletingId === record.id" class="loading loading-spinner loading-xs"></span>
+                       <span v-else>🗑️</span>
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+    
+        <number-selector-modal 
+          :is-open="isModalOpen" 
+          :title="currentAction.name" 
+          :kcal-per-rep="currentAction.kcal" 
+          :loading="loading"
+          @close="closeModal" 
+          @confirm="handleConfirm" 
+        ></number-selector-modal>
+
+        <rest-timer-modal 
+          :is-open="isRestTimerOpen" 
+          @close="isRestTimerOpen = false"
+        ></rest-timer-modal>
+      </div>
+  </script>
+
+  <!-- TEMPLATE: Modal -->
+  <script type="text/x-template" id="modal-template">
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="close"></div>
+        
+        <!-- Modal Content -->
+        <div class="relative w-full max-w-lg bg-base-100 rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl transform transition-transform animate-slide-up overflow-hidden">
+          <!-- Drag Handle -->
+          <div class="w-12 h-1.5 bg-base-300 rounded-full mx-auto mb-6 opacity-50"></div>
+          
+          <div class="text-center mb-8">
+             <h3 class="text-2xl font-black text-base-content mb-1">{{ title }}</h3>
+             <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wide">
+                <span>🔥</span>
+                <span>{{ kcalPerRep }} 千卡 / 次</span>
+             </div>
+          </div>
+          
+          <!-- Main Counter -->
+          <div class="flex items-center justify-between gap-4 mb-10 px-4">
+              <button 
+                class="btn btn-circle btn-xl bg-base-200 hover:bg-base-300 border-none text-2xl h-16 w-16 shadow-inner active:scale-95 transition-transform"
+                @click="decrement"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M20 12H4" /></svg>
+              </button>
+              
+              <div class="flex flex-col items-center">
+                 <input 
+                    type="number" 
+                    :value="count" 
+                    @input="e => updateCount(e.target.value)"
+                    class="text-7xl font-black text-center w-40 bg-transparent border-none focus:ring-0 p-0 tabular-nums tracking-tighter"
+                 />
+                 <span class="text-sm font-bold text-base-content/40 uppercase tracking-widest mt-[-5px]">次</span>
+              </div>
+              
+              <button 
+                class="btn btn-circle btn-xl bg-base-200 hover:bg-base-300 border-none text-2xl h-16 w-16 shadow-inner active:scale-95 transition-transform"
+                @click="increment"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              </button>
+          </div>
+          
+          <!-- Presets -->
+          <div class="flex justify-between gap-2 mb-8 overflow-x-auto pb-2 px-1 scrollbar-hide">
+             <button 
+                v-for="preset in presets" 
+                :key="preset"
+                @click="selectPreset(preset)"
+                class="btn btn-md rounded-2xl flex-1 font-bold border-none transition-all"
+                :class="count === preset ? 'bg-primary text-primary-content shadow-lg shadow-primary/30' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+             >
+                {{ preset }}
+             </button>
+          </div>
+          
+          <!-- Info & Actions -->
+          <div class="bg-base-200/50 rounded-3xl p-4 mb-6 flex items-center justify-between">
+              <div class="flex flex-col pl-2">
+                 <span class="text-xs font-bold text-base-content/50 uppercase">预计消耗</span>
+                 <span class="text-2xl font-black text-primary">{{ estimatedKcal }} <span class="text-sm text-base-content/40 font-medium">kcal</span></span>
+              </div>
+              <button 
+                  class="btn btn-primary btn-lg rounded-2xl px-8 font-bold shadow-xl shadow-primary/20" 
+                  @click="confirm"
+                  :disabled="loading"
+              >
+                 <span v-if="loading" class="loading loading-spinner"></span>
+                 <span v-else>保存记录</span>
+              </button>
+          </div>
+        </div>
+      </div>
+  </script>
+
+  <!-- TEMPLATE: Rest Timer Modal -->
+  <script type="text/x-template" id="rest-timer-template">
+    <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-center justify-center">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"></div>
+        
+        <!-- Content -->
+        <div class="relative w-full max-w-sm mx-6 bg-base-100 rounded-[2.5rem] p-8 shadow-2xl text-center overflow-hidden animate-slide-up">
+            <!-- Decorative Background -->
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-secondary"></div>
+            
+            <h3 class="text-2xl font-black text-base-content mb-2">休息一下</h3>
+            <p class="text-base-content/60 font-medium mb-8">准备下一组训练</p>
+            
+            <!-- Timer Circle -->
+            <div class="relative w-48 h-48 mx-auto mb-8 flex items-center justify-center">
+                <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-base-200" stroke-width="8" />
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-primary transition-all duration-1000 ease-linear" stroke-width="8" :stroke-dasharray="283" :stroke-dashoffset="283 - (283 * timeLeft / totalTime)" stroke-linecap="round" />
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center flex-col">
+                    <span class="text-6xl font-black tabular-nums tracking-tighter">{{ timeLeft }}</span>
+                    <span class="text-xs font-bold text-base-content/40 uppercase tracking-widest mt-1">秒</span>
+                </div>
+            </div>
+            
+            <button 
+                class="btn btn-ghost btn-lg w-full rounded-2xl font-bold text-base-content/60 hover:text-base-content hover:bg-base-200" 
+                @click="stop"
+            >
+                开始下一组
+            </button>
+        </div>
+    </div>
+  </script>
+
+  <script>
+    const { createApp, ref, computed, watch, onMounted, onUnmounted, defineComponent, toRef } = Vue; // Added toRef
+    const { createRouter, createWebHashHistory, useRouter } = VueRouter;
+    const { defineStore, createPinia } = Pinia;
+
+    // --- Store ---
+    const useAuthStore = defineStore('auth', () => {
+      const userConfig = ref(JSON.parse(localStorage.getItem('userConfig')) || null);
+      
+      function login(config) {
+        userConfig.value = config;
+        localStorage.setItem('userConfig', JSON.stringify(config));
+      }
+
+      function logout() {
+        userConfig.value = null;
+        localStorage.removeItem('userConfig');
+        window.location.hash = '#/login'; 
+      }
+
+      return { userConfig, login, logout };
+    });
+
+    // --- Components ---
+
+    // NumberSelectorModal
+    const NumberSelectorModal = defineComponent({
+      template: '#modal-template',
+      props: ['isOpen', 'title', 'kcalPerRep', 'loading'], 
+      emits: ['close', 'confirm'],
+      setup(props, { emit }) {
+        const count = ref(10);
+        const presets = [10, 20, 30, 40, 50];
+
+        watch(() => props.isOpen, (newVal) => {
+          if (newVal) {
+            count.value = 10;
+          }
+        });
+
+        const estimatedKcal = computed(() => {
+          return (count.value * props.kcalPerRep).toFixed(1);
+        });
+
+        const increment = () => count.value++;
+        const decrement = () => {
+          if (count.value > 1) count.value--;
+        };
+        
+        const updateCount = (val) => {
+            let num = parseInt(val);
+            if (!isNaN(num) && num > 0) {
+                count.value = num;
+            }
+        }
+
+        const selectPreset = (val) => {
+          count.value = val;
+        };
+
+        const confirm = () => {
+          if (navigator.vibrate) navigator.vibrate(50);
+          emit('confirm', count.value, estimatedKcal.value);
+        };
+
+        const close = () => {
+          if (!props.loading) { // Prevent closing while loading
+            emit('close');
+          }
+        };
+        
+        const loading = computed(() => props.loading);
+
+        return { count, presets, estimatedKcal, increment, decrement, updateCount, selectPreset, confirm, close, loading };
+      }
+    });
+
+    // Rest Timer Modal
+    const RestTimerModal = defineComponent({
+      template: '#rest-timer-template',
+      props: ['isOpen'],
+      emits: ['close'],
+      setup(props, { emit }) {
+        const totalTime = 60;
+        const timeLeft = ref(totalTime);
+        let timer = null;
+
+        const startTimer = () => {
+            if (timer) clearInterval(timer);
+            timeLeft.value = totalTime;
+            timer = setInterval(() => {
+                if (timeLeft.value > 0) {
+                    timeLeft.value--;
+                } else {
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    clearInterval(timer);
+                    timer = null;
+                }
+            }, 1000);
+        };
+
+        const stopTimer = () => {
+            if (timer) clearInterval(timer);
+            timer = null;
+        };
+
+        watch(() => props.isOpen, (newVal) => {
+            if (newVal) {
+                startTimer();
+            } else {
+                stopTimer();
+            }
+        });
+
+        const stop = () => {
+            stopTimer();
+            emit('close');
+        };
+
+        onUnmounted(() => {
+            stopTimer();
+        });
+
+        return { timeLeft, totalTime, stop };
+      }
+    });
+
+    // Login
+    const Login = defineComponent({
+      template: '#login-template',
+      setup() {
+        const router = useRouter();
+        const authStore = useAuthStore();
+        
+        const username = ref('');
+        const password = ref('');
+        const loading = ref(false);
+        const error = ref('');
+
+        const handleLogin = async () => {
+          loading.value = true;
+          error.value = '';
+          
+          try {
+            const response = await axios.post('/api/login', {
+              username: username.value,
+              password: password.value,
+            });
+            
+            if (response.data.success) {
+              authStore.login(response.data.userConfig);
+              router.push('/');
+            }
+          } catch (err) {
+            error.value = err.response?.data?.error || 'Login failed';
+            setTimeout(() => {
+              error.value = '';
+            }, 3000);
+          } finally {
+            loading.value = false;
+          }
+        };
+        
+        return { username, password, loading, error, handleLogin };
+      }
+    });
+
+    // Dashboard
+    const Dashboard = defineComponent({
+      template: '#dashboard-template',
+      components: { NumberSelectorModal, RestTimerModal },
+      setup() {
+        const authStore = useAuthStore();
+        const history = ref([]);
+        const isModalOpen = ref(false);
+        const isRestTimerOpen = ref(false);
+        const currentAction = ref({});
+        const loading = ref(false);
+        const initLoading = ref(true);
+        const deletingId = ref(null);
+        
+        const actions = [
+          { id: 'pull_ups', name: '引体向上', kcal: 0.5, icon: '💪', color: 'bg-blue-100 text-blue-600' },
+          { id: 'push_ups', name: '俯卧撑', kcal: 0.2, icon: '🤸', color: 'bg-purple-100 text-purple-600' },
+          { id: 'crunches', name: '卷腹', kcal: 0.1, icon: '🧘', color: 'bg-orange-100 text-orange-600' },
+          { id: 'plank', name: '平板支撑', kcal: 0.4, icon: '💪', color: 'bg-orange-100 text-orange-600' }
+        ];
+
+        onMounted(async () => {
+          await fetchHistory();
+        });
+
+        const fetchHistory = async () => {
+            const config = authStore.userConfig?.configuration;
+            const userId = authStore.userConfig?.userId;
+            
+            if (!config || !userId) {
+                initLoading.value = false;
+                return;
+            }
+
+            try {
+                const response = await axios.post('/api/get-history', {
+                    userId: userId,
+                    appToken: config.fs_app_token,
+                    tableId: config.fs_table_id
+                });
+
+                console.log("Raw history from API:", response.data.data); // Debug log
+
+                if (response.data.success) {
+                    history.value = response.data.data.map(item => {
+                        const fields = item.fields;
+                        const actionId = fields.training_types;
+                        const action = actions.find(a => a.id === actionId);
+                        
+                        // Calculate kcal if not present
+                        let kcal = fields.Kcal_Burned;
+                        if (!kcal && action) {
+                            kcal = (fields.count * action.kcal).toFixed(1);
+                        }
+
+                        // Debug: check date
+                        // console.log("Item date:", item.createdTime);
+
+                        return {
+                            id: item.id,
+                            date: item.createdTime,
+                            actionType: action ? action.name : actionId,
+                            count: fields.count,
+                            kcal: kcal || 0
+                        };
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to fetch history:', error);
+            } finally {
+                initLoading.value = false;
+            }
+        };
+
+        const todayRecords = computed(() => {
+          const today = new Date().toDateString();
+          return history.value.filter(record => new Date(record.date).toDateString() === today);
+        });
+
+        const todayKcal = computed(() => {
+          return todayRecords.value.reduce((sum, record) => sum + parseFloat(record.kcal), 0).toFixed(1);
+        });
+
+        const todaySets = computed(() => todayRecords.value.length);
+
+        const openModal = (action) => {
+          currentAction.value = action;
+          isModalOpen.value = true;
+        };
+
+        const closeModal = () => {
+          isModalOpen.value = false;
+        };
+
+        const handleConfirm = async (count) => {
+          if (!currentAction.value.id) return;
+          
+          loading.value = true;
+
+          try {
+            // Optimistic update removed per user request - waiting for backend
+            
+            // Sync with Server
+            const config = authStore.userConfig?.configuration;
+            const userId = authStore.userConfig?.userId;
+
+            if (config && userId) {
+                 await axios.post('/api/submit-record', {
+                  userId: userId,
+                  appToken: config.fs_app_token,
+                  tableId: config.fs_table_id,
+                  trainingType: currentAction.value.id,
+                  count: count
+                });
+                
+                // Refresh history from server to ensure data consistency and get the real record ID
+                await fetchHistory();
+                
+                closeModal();
+                isRestTimerOpen.value = true;
+            } else {
+                console.warn("Missing config or userId, skipping API sync");
+                alert("Cannot sync: Missing configuration.");
+                closeModal();
+            }
+            
+          } catch (error) {
+            console.error('Failed to submit record:', error);
+            alert('Failed to sync with server.');
+          } finally {
+            loading.value = false;
+          }
+        };
+
+        const deleteRecord = async (id) => {
+          if (confirm('确认删除这条记录吗？')) {
+            deletingId.value = id;
+            try {
+                const config = authStore.userConfig?.configuration;
+                const userId = authStore.userConfig?.userId;
+                
+                if (config && userId) {
+                    await axios.post('/api/delete-record', {
+                        userId: userId,
+                        appToken: config.fs_app_token,
+                        tableId: config.fs_table_id,
+                        recordId: id
+                    });
+                    
+                    // Remove from local list after successful backend deletion
+                    history.value = history.value.filter(item => item.id !== id);
+                } else {
+                    alert("配置缺失，无法删除云端记录。");
+                }
+            } catch (error) {
+                console.error("Failed to delete record:", error);
+                alert("删除云端记录失败。");
+            } finally {
+                deletingId.value = null;
+            }
+          }
+        };
+
+        const logout = () => {
+          authStore.logout();
+        };
+
+        const userInitial = computed(() => {
+            const name = authStore.userConfig?.username || authStore.userConfig?.nickname || 'Athlete';
+            try {
+                if (Array.isArray(name)) {
+                    return String(name[0]?.text || name[0] || 'U').charAt(0).toUpperCase();
+                }
+                return String(name).charAt(0).toUpperCase();
+            } catch (e) {
+                return 'U';
+            }
+        });
+
+        const getIcon = (name) => {
+          const action = actions.find(a => a.name === name);
+          return action ? action.icon : '📝';
+        };
+
+        const getActionColor = (name) => {
+            const action = actions.find(a => a.name === name);
+            return action ? action.color : 'bg-gray-100 text-gray-600';
+        }
+
+        const formatTime = (dateStr) => {
+          return new Date(dateStr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        };
+
+        return { 
+          authStore, 
+          history, 
+          isModalOpen, 
+          currentAction, 
+          loading, 
+          initLoading, 
+          actions,
+          todayRecords, 
+          todayKcal, 
+          todaySets,
+          openModal, 
+          closeModal, 
+          handleConfirm, 
+          deleteRecord, 
+          logout,
+          getIcon, 
+          getActionColor, 
+          formatTime, 
+          userInitial, 
+          deletingId,
+          isRestTimerOpen
+        };
+      }
+    });
+
+    // --- Router ---
+    const router = createRouter({
+      history: createWebHashHistory(),
+      routes: [
+        {
+          path: '/login',
+          name: 'Login',
+          component: Login,
+        },
+        {
+          path: '/',
+          name: 'Dashboard',
+          component: Dashboard,
+          meta: { requiresAuth: true },
+        },
+      ],
+    });
+
+    router.beforeEach((to, from, next) => {
+      const authStore = useAuthStore();
+      if (to.meta.requiresAuth && !authStore.userConfig) {
+        next('/login');
+      } else if (to.path === '/login' && authStore.userConfig) {
+        next('/');
+      } else {
+        next();
+      }
+    });
+
+    // --- App Initialization ---
+    const app = createApp({
+      setup() {
+        return {};
+      }
+    });
+
+    app.use(createPinia());
+    app.use(router);
+    app.mount('#app');
+  </script>
+</body>
+</html>
