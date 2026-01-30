@@ -1,20 +1,43 @@
-.vercel
-.agent
-.claude
-.codebuddy
-.env
-.env.test
-.env.production
-.trae   
-.roo    
-.qoder
-.opencode
-.kiro
-.github 
-.cursor
-.gemini
-.cursor
-.continue
-.codex
-.windsur
+# Dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# System Files
+.DS_Store
+Thumbs.db
+.fsevents.cache
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!.env.example
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+.trae/
+.windsurf/
+.roo/
+.history/
+
+# Vercel
+.vercel/
+
+# Build Output (if any)
+dist/
+build/
+coverage/
+
+# Logs
+logs/
+*.log
