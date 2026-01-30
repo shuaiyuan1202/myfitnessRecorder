@@ -1,0 +1,17 @@
+{
+  "name": "FitTrack 运动记录",
+  "short_name": "FitTrack",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "description": "记录你的每一次进步",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
