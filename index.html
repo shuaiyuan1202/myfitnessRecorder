@@ -142,94 +142,74 @@
 
   <!-- TEMPLATE: Dashboard -->
   <script type="text/x-template" id="dashboard-template">
-    <div class="min-h-screen bg-base-200/50 pb-24 font-sans">
-        <!-- Header -->
-        <header class="pt-8 px-6 pb-6 bg-base-100 rounded-b-[2.5rem] shadow-sm mb-6">
-           <div class="flex justify-between items-center mb-6">
-             <div>
-               <p class="text-sm text-base-content/60 font-medium">你好，</p>
-               <h1 class="text-2xl font-black text-base-content">{{ authStore.userConfig?.username[0].text || 'Athlete' }}</h1>
-             </div>
-             <div class="dropdown dropdown-end">
-                <div tabindex="0" role="button" class="btn btn-circle btn-ghost bg-base-200 hover:bg-base-300 border-none shadow-sm">
-                   <span class="text-xl font-bold text-primary">{{ userInitial }}</span>
+    <div class="min-h-screen bg-base-200/50 pb-24 font-sans flex flex-col h-screen overflow-hidden">
+        
+        <!-- MAIN CONTENT AREA -->
+        <div class="flex-1 overflow-y-auto pb-24">
+            <!-- TODAY TAB -->
+            <div v-if="activeTab === 'today'" class="animate-fade-in">
+                <!-- Header -->
+                <header class="pt-8 px-6 pb-6 bg-base-100 rounded-b-[2.5rem] shadow-sm mb-6">
+                   <div class="flex justify-between items-center mb-6">
+                     <div>
+                       <p class="text-sm text-base-content/60 font-medium">你好，</p>
+                       <h1 class="text-2xl font-black text-base-content">{{ authStore.userConfig?.username[0].text || 'Athlete' }}</h1>
+                     </div>
+                     <div class="dropdown dropdown-end">
+                        <div tabindex="0" role="button" class="btn btn-circle btn-ghost bg-base-200 hover:bg-base-300 border-none shadow-sm">
+                           <span class="text-xl font-bold text-primary">{{ userInitial }}</span>
+                        </div>
+                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100 rounded-2xl w-40 border border-base-200">
+                          <li><a @click="logout" class="text-error font-medium">退出登录</a></li>
+                        </ul>
+                     </div>
+                   </div>
+            
+                   <!-- Main Stats Card -->
+                   <div class="bg-primary text-primary-content rounded-[2rem] p-6 shadow-xl shadow-primary/30 relative overflow-hidden">
+                     <!-- Background Patterns -->
+                     <div class="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+                     <div class="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
+                     
+                     <div class="flex justify-between items-end relative z-10">
+                        <div>
+                            <div class="text-primary-content/80 text-sm font-medium mb-1">今日消耗</div>
+                            <div class="text-5xl font-black tracking-tight">{{ todayKcal }}</div>
+                            <div class="text-primary-content/60 text-xs mt-2 font-medium">卡路里</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-3xl font-bold">{{ todaySets }}</div>
+                            <div class="text-primary-content/80 text-xs font-medium uppercase tracking-wide">运动组数</div>
+                        </div>
+                     </div>
+                   </div>
+                </header>
+            
+                <!-- Quick Actions -->
+                <div class="px-6 mb-8">
+                   <div class="flex items-center justify-between mb-4">
+                     <h3 class="font-bold text-lg text-base-content/90">快速记录</h3>
+                   </div>
+                   
+                   <div class="grid grid-cols-3 gap-4">
+                      <button 
+                         v-for="action in actions" 
+                         :key="action.id"
+                         @click="openModal(action)"
+                         class="flex flex-col items-center justify-center gap-3 p-4 bg-base-100 rounded-3xl shadow-sm border border-base-100 hover:border-primary/30 hover:shadow-md active:scale-95 transition-all group h-32"
+                      >
+                         <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-transform group-hover:-translate-y-1" :class="action.color">
+                            {{ action.icon }}
+                         </div>
+                         <span class="text-xs font-bold text-base-content/70 group-hover:text-primary transition-colors">{{ action.name }}</span>
+                      </button>
+                   </div>
                 </div>
-                <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100 rounded-2xl w-40 border border-base-200">
-                  <li><a @click="logout" class="text-error font-medium">退出登录</a></li>
-                </ul>
-             </div>
-           </div>
-    
-           <!-- Main Stats Card -->
-           <div class="bg-primary text-primary-content rounded-[2rem] p-6 shadow-xl shadow-primary/30 relative overflow-hidden">
-             <!-- Background Patterns -->
-             <div class="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-             <div class="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
-             
-             <div class="flex justify-between items-end relative z-10">
-                <div>
-                    <div class="text-primary-content/80 text-sm font-medium mb-1">今日消耗</div>
-                    <div class="text-5xl font-black tracking-tight">{{ todayKcal }}</div>
-                    <div class="text-primary-content/60 text-xs mt-2 font-medium">卡路里</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-3xl font-bold">{{ todaySets }}</div>
-                    <div class="text-primary-content/80 text-xs font-medium uppercase tracking-wide">运动组数</div>
-                </div>
-             </div>
-           </div>
-        </header>
-    
-        <!-- Quick Actions -->
-        <div class="px-6 mb-8">
-           <div class="flex items-center justify-between mb-4">
-             <h3 class="font-bold text-lg text-base-content/90">快速记录</h3>
-             <!-- <button class="btn btn-xs btn-ghost text-primary">编辑</button> -->
-           </div>
-           
-           <div class="grid grid-cols-3 gap-4">
-              <button 
-                 v-for="action in actions" 
-                 :key="action.id"
-                 @click="openModal(action)"
-                 class="flex flex-col items-center justify-center gap-3 p-4 bg-base-100 rounded-3xl shadow-sm border border-base-100 hover:border-primary/30 hover:shadow-md active:scale-95 transition-all group h-32"
-              >
-                 <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-transform group-hover:-translate-y-1" :class="action.color">
-                    {{ action.icon }}
-                 </div>
-                 <span class="text-xs font-bold text-base-content/70 group-hover:text-primary transition-colors">{{ action.name }}</span>
-              </button>
-           </div>
-        </div>
-    
-        <!-- History Section -->
-        <div class="px-6 pb-20 overflow-hidden">
-           <div class="flex items-center gap-6 mb-4">
-              <h3 
-                class="font-bold text-lg transition-colors cursor-pointer" 
-                :class="historyMode === 'today' ? 'text-base-content/90 scale-105' : 'text-base-content/40'"
-                @click="switchHistoryMode('today')"
-              >
-                今日记录
-              </h3>
-              <h3 
-                class="font-bold text-lg transition-colors cursor-pointer" 
-                :class="historyMode === 'history' ? 'text-base-content/90 scale-105' : 'text-base-content/40'"
-                @click="switchHistoryMode('history')"
-              >
-                历史记录
-              </h3>
-           </div>
-           
-           <!-- Swipe Container -->
-           <div 
-             class="relative min-h-[300px]"
-             @touchstart="onTouchStart" 
-             @touchend="onTouchEnd"
-           >
-              <!-- Today View -->
-              <div v-if="historyMode === 'today'" class="transition-all duration-300 animate-fade-in">
-                  <div class="relative border-l-2 border-base-300 space-y-8">
+
+                <!-- Today's List -->
+                <div class="px-6 pb-20">
+                   <h3 class="font-bold text-lg text-base-content/90 mb-4">今日记录</h3>
+                   <div class="relative border-l-2 border-base-300 space-y-8">
                       <!-- Loading Skeleton -->
                       <div v-if="initLoading" class="pl-6 space-y-4">
                           <div class="h-20 bg-base-100 rounded-2xl animate-pulse"></div>
@@ -281,53 +261,156 @@
                          </div>
                       </div>
                    </div>
-              </div>
+                </div>
+            </div>
 
-              <!-- History Heatmap View -->
-              <div v-else class="transition-all duration-300 animate-fade-in">
-                  <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 overflow-hidden">
-                      <div class="overflow-x-auto pb-2 scrollbar-hide" style="direction: rtl;">
-                          <!-- Grid Container (Reversed direction for RTL to start from right) -->
-                          <div class="grid grid-rows-7 grid-flow-col gap-1 w-max ltr" style="direction: ltr;">
-                             <div 
-                                v-for="(day, index) in heatmapData" 
-                                :key="index"
-                                class="w-3 h-3 rounded-[2px] transition-colors hover:ring-2 ring-primary/50 relative group cursor-pointer"
-                                :class="[day.color, {'invisible': day.invisible}]"
-                             >
-                                <!-- Tooltip -->
-                                <div v-if="!day.invisible" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
-                                    {{ day.date }}: {{ day.count }} 组
-                                </div>
-                             </div>
-                          </div>
-                      </div>
-                      
-                      <!-- Legend -->
-                      <div class="flex items-center justify-end gap-2 mt-4 text-xs text-base-content/40">
-                          <span>少</span>
-                          <div class="w-3 h-3 rounded-[2px] bg-base-200"></div>
-                          <div class="w-3 h-3 rounded-[2px] bg-green-200"></div>
-                          <div class="w-3 h-3 rounded-[2px] bg-green-400"></div>
-                          <div class="w-3 h-3 rounded-[2px] bg-green-600"></div>
-                          <span>多</span>
-                      </div>
-                  </div>
+            <!-- HISTORY TAB -->
+            <div v-else-if="activeTab === 'history'" class="animate-fade-in px-6 pt-8">
+                <h1 class="text-3xl font-black text-base-content mb-8">历史记录</h1>
+                
+                <!-- History Heatmap View -->
+                <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 overflow-hidden mb-6" style="overflow: visible !important;">
+                    <div class="overflow-x-auto pb-2 scrollbar-hide" style="direction: rtl; overflow: visible !important;">
+                        <!-- Grid Container (Reversed direction for RTL to start from right) -->
+                        <div class="grid grid-rows-7 grid-flow-col gap-1 w-max ltr" style="direction: ltr;">
+                           <div 
+                              v-for="(day, index) in heatmapData" 
+                              :key="index"
+                              class="w-3 h-3 rounded-[2px] transition-colors hover:ring-2 ring-primary/50 relative group cursor-pointer"
+                              :class="[day.color, {'invisible': day.invisible}]"
+                           >
+                              <!-- Tooltip -->
+                              <div v-if="!day.invisible" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
+                                  {{ day.date }}: {{ day.count }} 组
+                              </div>
+                           </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="flex items-center justify-end gap-2 mt-4 text-xs text-base-content/40">
+                        <span>少</span>
+                        <div class="w-3 h-3 rounded-[2px] bg-base-200"></div>
+                        <div class="w-3 h-3 rounded-[2px] bg-green-200"></div>
+                        <div class="w-3 h-3 rounded-[2px] bg-green-400"></div>
+                        <div class="w-3 h-3 rounded-[2px] bg-green-600"></div>
+                        <span>多</span>
+                    </div>
+                </div>
 
-                  <!-- Stats Card -->
-                  <div class="mt-4 p-5 bg-gradient-to-br from-base-100 to-base-200 rounded-3xl border border-base-100 shadow-sm">
-                      <div class="flex items-center gap-3 mb-2">
-                          <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">📊</div>
-                          <h4 class="font-bold text-base-content/80">本月统计</h4>
-                      </div>
-                      <p class="text-base-content font-medium leading-relaxed">
-                          {{ historyStatsText }}
-                      </p>
-                  </div>
-              </div>
-           </div>
+                <!-- Stats Card -->
+                <div class="p-5 bg-gradient-to-br from-base-100 to-base-200 rounded-3xl border border-base-100 shadow-sm mb-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">📊</div>
+                        <h4 class="font-bold text-base-content/80">本月统计</h4>
+                    </div>
+                    <p class="text-base-content font-medium leading-relaxed">
+                        {{ historyStatsText }}
+                    </p>
+                </div>
+
+                <!-- Full List (Optional or simple list) -->
+                <!-- Reuse the list logic but for all history or recent -->
+                 <div v-if="allHistory.length > 0">
+                    <h3 class="font-bold text-lg text-base-content/90 mb-4">最近记录</h3>
+                    <div class="space-y-4">
+                        <div 
+                           v-for="(record, index) in allHistory.slice(0, 20)" 
+                           :key="record.id"
+                           class="bg-base-100 p-4 rounded-2xl shadow-sm border border-base-100 flex justify-between items-center"
+                        >
+                            <div class="flex items-center gap-3">
+                               <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center text-xl">
+                                  {{ getIcon(record.actionType) }}
+                               </div>
+                               <div>
+                                  <div class="font-bold text-base-content">{{ record.actionType }}</div>
+                                  <div class="text-xs text-base-content/50 font-medium">{{ formatTime(record.date) }} <span class="ml-1 opacity-50">{{ new Date(record.date).toLocaleDateString() }}</span></div>
+                               </div>
+                            </div>
+                            <div class="text-right">
+                               <div class="font-black text-lg text-base-content">{{ record.count }}</div>
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- PUMP TAB -->
+            <div v-else-if="activeTab === 'pump'" class="h-full relative flex flex-col items-center justify-center overflow-hidden bg-base-100 animate-fade-in">
+                <!-- Swipeable Cards Container -->
+                <div class="relative w-full max-w-sm h-[60vh] flex items-center justify-center perspective-1000">
+                    
+                    <div v-if="pumpLoading" class="loading loading-spinner loading-lg text-primary"></div>
+                    
+                    <div v-else-if="pumpData.length === 0" class="text-center p-8">
+                        <h2 class="text-2xl font-bold mb-2">暂无数据</h2>
+                        <button @click="fetchPumpData" class="btn btn-primary btn-sm">重试</button>
+                    </div>
+
+                    <div 
+                        v-else
+                        class="absolute w-full h-full p-6 transition-transform duration-300 ease-out"
+                        :style="cardStyle"
+                        @touchstart="onCardTouchStart"
+                        @touchmove="onCardTouchMove"
+                        @touchend="onCardTouchEnd"
+                        @mousedown="onCardTouchStart"
+                        @mousemove="onCardTouchMove"
+                        @mouseup="onCardTouchEnd"
+                        @mouseleave="onCardTouchEnd"
+                    >
+                        <!-- Card -->
+                        <div class="w-full h-full bg-white rounded-[2rem] shadow-2xl border border-base-200 flex flex-col overflow-hidden relative select-none cursor-grab active:cursor-grabbing">
+                            <!-- Cover Image -->
+                            <div v-if="currentCard.cover" class="h-1/2 w-full bg-gray-100 overflow-hidden">
+                                <img :src="currentCard.cover" class="w-full h-full object-cover pointer-events-none" alt="Cover">
+                            </div>
+                            <div v-else class="h-1/2 w-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                                <span class="text-6xl">⚡️</span>
+                            </div>
+
+                            <!-- Content -->
+                            <div class="flex-1 p-8 flex flex-col items-center justify-center text-center bg-white relative z-10">
+                                <div class="badge badge-outline mb-4 opacity-50">{{ currentCard.category || '精选' }}</div>
+                                <h2 class="text-3xl font-black text-black mb-4 leading-tight">{{ currentCard.title || '无标题' }}</h2>
+                                <p class="text-base-content/60 font-medium line-clamp-3">{{ currentCard.content || '暂无内容' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-8 text-xs text-base-content/30 font-medium text-center w-full px-6">
+                    氮泵量有限，功能测试中，敬请期待~
+                </div>
+            </div>
         </div>
-    
+
+        <!-- BOTTOM NAVIGATION -->
+        <div class="btm-nav btm-nav-lg bg-base-100/90 backdrop-blur-md border-t border-base-200 z-40 rounded-t-3xl shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)]">
+            <button 
+                :class="activeTab === 'today' ? 'active text-primary bg-primary/10' : 'text-base-content/40 hover:text-base-content/60'"
+                @click="activeTab = 'today'"
+            >
+                <span class="text-xl mb-1">📅</span>
+                <span class="btm-nav-label text-xs font-bold">今日</span>
+            </button>
+            <button 
+                :class="activeTab === 'history' ? 'active text-primary bg-primary/10' : 'text-base-content/40 hover:text-base-content/60'"
+                @click="switchTab('history')"
+            >
+                <span class="text-xl mb-1">📊</span>
+                <span class="btm-nav-label text-xs font-bold">历史</span>
+            </button>
+            <button 
+                :class="activeTab === 'pump' ? 'active text-primary bg-primary/10' : 'text-base-content/40 hover:text-base-content/60'"
+                @click="switchTab('pump')"
+            >
+                <span class="text-xl mb-1">⚡️</span>
+                <span class="btm-nav-label text-xs font-bold">氮泵</span>
+            </button>
+        </div>
+
         <number-selector-modal 
           :is-open="isModalOpen" 
           :title="currentAction.name" 
@@ -341,7 +424,7 @@
           :is-open="isRestTimerOpen" 
           @close="isRestTimerOpen = false"
         ></rest-timer-modal>
-      </div>
+    </div>
   </script>
 
   <!-- TEMPLATE: Modal -->
@@ -651,7 +734,7 @@
         const authStore = useAuthStore();
         const history = ref([]);
         const allHistory = ref([]);
-        const historyMode = ref('today'); // 'today' or 'history'
+        const activeTab = ref('today'); // 'today', 'history', 'pump'
         const isModalOpen = ref(false);
         const isRestTimerOpen = ref(false);
         const currentAction = ref({});
@@ -659,9 +742,18 @@
         const initLoading = ref(true);
         const deletingId = ref(null);
         
-        // Touch handling
-        const touchStartX = ref(0);
-        const touchEndX = ref(0);
+        // Pump Data
+        const pumpData = ref([]);
+        const currentCardIndex = ref(0);
+        const pumpLoading = ref(false);
+        const cardX = ref(0);
+        const cardY = ref(0);
+        const cardRotation = ref(0);
+        const isDragging = ref(false);
+        
+        // Touch handling for general swipe (removed for tabs, but kept logic vars if needed)
+        // const touchStartX = ref(0);
+        // const touchEndX = ref(0);
         
         const actions = [
           { id: 'pull_ups', name: '引体向上', kcal: 0.5, icon: '💪', color: 'bg-blue-100 text-blue-600' },
@@ -724,33 +816,115 @@
             }
         };
 
-        const switchHistoryMode = async (mode) => {
-            if (mode === historyMode.value) return;
-            historyMode.value = mode;
-            if (mode === 'history' && allHistory.value.length === 0) {
+        const switchTab = async (tab) => {
+            activeTab.value = tab;
+            if (tab === 'history' && allHistory.value.length === 0) {
                 await fetchHistory('all');
             }
-        };
-
-        const onTouchStart = (e) => {
-            touchStartX.value = e.changedTouches[0].screenX;
-        };
-
-        const onTouchEnd = (e) => {
-            touchEndX.value = e.changedTouches[0].screenX;
-            handleSwipe();
-        };
-
-        const handleSwipe = () => {
-            if (touchEndX.value < touchStartX.value - 50) {
-                // Swipe Left -> Show History
-                switchHistoryMode('history');
-            }
-            if (touchEndX.value > touchStartX.value + 50) {
-                // Swipe Right -> Show Today
-                switchHistoryMode('today');
+            if (tab === 'pump' && pumpData.value.length === 0) {
+                await fetchPumpData();
             }
         };
+
+        // --- Pump Logic ---
+        const fetchPumpData = async () => {
+            pumpLoading.value = true;
+            try {
+                const response = await axios.get('/api/get-pump');
+                if (response.data.success && response.data.data) {
+                    // Shuffle the data
+                    const items = response.data.data;
+                    for (let i = items.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [items[i], items[j]] = [items[j], items[i]];
+                    }
+                    
+                    // Map fields
+                    pumpData.value = items.map(item => ({
+                        id: item.id,
+                        title: item.title && item.title[0] ? item.title[0].text : '',
+                        content: item.content && item.content[0] ? item.content[0].text : '',
+                        cover: item.cover && item.cover[0] ? item.cover[0].url : null,
+                        category: item.categroy ? item.categroy : '', // Note: 'categroy' typo in user input/field name
+                        music: item.music && item.music[0] ? item.music[0].url : null
+                    }));
+                    currentCardIndex.value = 0;
+                }
+            } catch (error) {
+                console.error('Failed to fetch pump data:', error);
+            } finally {
+                pumpLoading.value = false;
+            }
+        };
+
+        const currentCard = computed(() => {
+            if (pumpData.value.length === 0) return {};
+            return pumpData.value[currentCardIndex.value] || {};
+        });
+
+        const cardStyle = computed(() => {
+            if (!isDragging.value) return {};
+            return {
+                transform: `translate(${cardX.value}px, ${cardY.value}px) rotate(${cardRotation.value}deg)`
+            };
+        });
+
+        // Card Swipe Handlers
+        let startX = 0;
+        let startY = 0;
+
+        const onCardTouchStart = (e) => {
+            isDragging.value = true;
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+            startX = clientX;
+            startY = clientY;
+        };
+
+        const onCardTouchMove = (e) => {
+            if (!isDragging.value) return;
+            e.preventDefault(); // Prevent scrolling
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+            
+            const deltaX = clientX - startX;
+            const deltaY = clientY - startY;
+            
+            cardX.value = deltaX;
+            cardY.value = deltaY;
+            cardRotation.value = deltaX * 0.1; // Rotate based on X movement
+        };
+
+        const onCardTouchEnd = (e) => {
+            if (!isDragging.value) return;
+            isDragging.value = false;
+            
+            const threshold = 100; // Swipe threshold
+            if (Math.abs(cardX.value) > threshold) {
+                // Swipe Out
+                const direction = cardX.value > 0 ? 1 : -1;
+                // Animate out (simple implementation: just switch)
+                // Ideally we'd animate off-screen then switch
+                nextCard();
+            }
+            
+            // Reset position
+            cardX.value = 0;
+            cardY.value = 0;
+            cardRotation.value = 0;
+        };
+
+        const nextCard = () => {
+            if (currentCardIndex.value < pumpData.value.length - 1) {
+                currentCardIndex.value++;
+            } else {
+                // Loop back or fetch more? Loop for now
+                currentCardIndex.value = 0;
+                // Reshuffle?
+            }
+        };
+
+        // --- End Pump Logic ---
 
         const heatmapData = computed(() => {
              if (allHistory.value.length === 0) return [];
@@ -953,13 +1127,20 @@
           userInitial, 
           deletingId,
           isRestTimerOpen,
-          historyMode,
-          switchHistoryMode,
-          onTouchStart,
-          onTouchEnd,
+          activeTab,
+          switchTab,
           heatmapData,
           historyStatsText,
-          allHistory
+          allHistory,
+          // Pump
+          pumpData,
+          currentCard,
+          cardStyle,
+          pumpLoading,
+          onCardTouchStart,
+          onCardTouchMove,
+          onCardTouchEnd,
+          fetchPumpData
         };
       }
     });

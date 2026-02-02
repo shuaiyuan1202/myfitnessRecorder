@@ -205,6 +205,39 @@ export async function getRecords(accessToken, appToken, tableId, userId, range =
   }
 }
 
+export async function getPumpData(accessToken, appToken, tableId, viewId) {
+  const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
+
+  try {
+    const response = await axios.get(url, {
+      params: {
+        view_id: viewId,
+        page_size: 100 // Fetch a batch to pick randomly from
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.data.code !== 0) {
+      console.error('Get pump data failed:', response.data);
+      throw new Error(`Feishu Get Pump Data Error: ${response.data.msg}`);
+    }
+
+    if (response.data.data && response.data.data.items) {
+      return response.data.data.items.map(item => ({
+        id: item.record_id,
+        ...item.fields
+      }));
+    }
+    return [];
+
+  } catch (error) {
+    console.error('Error getting pump data:', error.response?.data || error);
+    throw error;
+  }
+}
+
 export async function addRecord(accessToken, appToken, tableId, recordData) {
     const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
     
