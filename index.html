@@ -202,59 +202,128 @@
            </div>
         </div>
     
-        <!-- History -->
-        <div class="px-6">
-           <h3 class="font-bold text-lg text-base-content/90 mb-4">今日记录</h3>
+        <!-- History Section -->
+        <div class="px-6 pb-20 overflow-hidden">
+           <div class="flex items-center gap-6 mb-4">
+              <h3 
+                class="font-bold text-lg transition-colors cursor-pointer" 
+                :class="historyMode === 'today' ? 'text-base-content/90 scale-105' : 'text-base-content/40'"
+                @click="switchHistoryMode('today')"
+              >
+                今日记录
+              </h3>
+              <h3 
+                class="font-bold text-lg transition-colors cursor-pointer" 
+                :class="historyMode === 'history' ? 'text-base-content/90 scale-105' : 'text-base-content/40'"
+                @click="switchHistoryMode('history')"
+              >
+                历史记录
+              </h3>
+           </div>
            
-           <div class="relative border-l-2 border-base-300 space-y-8">
-              <!-- Loading Skeleton -->
-              <div v-if="initLoading" class="pl-6 space-y-4">
-                  <div class="h-20 bg-base-100 rounded-2xl animate-pulse"></div>
-                  <div class="h-20 bg-base-100 rounded-2xl animate-pulse opacity-60"></div>
-                  <div class="h-20 bg-base-100 rounded-2xl animate-pulse opacity-30"></div>
+           <!-- Swipe Container -->
+           <div 
+             class="relative min-h-[300px]"
+             @touchstart="onTouchStart" 
+             @touchend="onTouchEnd"
+           >
+              <!-- Today View -->
+              <div v-if="historyMode === 'today'" class="transition-all duration-300 animate-fade-in">
+                  <div class="relative border-l-2 border-base-300 space-y-8">
+                      <!-- Loading Skeleton -->
+                      <div v-if="initLoading" class="pl-6 space-y-4">
+                          <div class="h-20 bg-base-100 rounded-2xl animate-pulse"></div>
+                          <div class="h-20 bg-base-100 rounded-2xl animate-pulse opacity-60"></div>
+                          <div class="h-20 bg-base-100 rounded-2xl animate-pulse opacity-30"></div>
+                      </div>
+
+                      <!-- Empty State -->
+                      <div v-else-if="history.length === 0" class="pl-6 py-8 text-center text-base-content/40 italic">
+                         暂无运动记录，快去动起来吧！
+                      </div>
+                      
+                      <!-- List -->
+                      <div 
+                         v-else
+                         v-for="(record, index) in history.slice(0, 10)" 
+                         :key="record.id"
+                         class="relative pl-6 group"
+                      >
+                         <!-- Timeline Dot -->
+                         <div class="absolute -left-[7px] top-6 w-4 h-4 rounded-full border-2 border-base-100" :class="index === 0 ? 'bg-primary ring-4 ring-primary/20' : 'bg-base-300'"></div>
+                         
+                         <!-- Content -->
+                         <div class="bg-base-100 p-4 rounded-2xl shadow-sm border border-base-100 flex justify-between items-center transition-transform">
+                            <div class="flex items-center gap-3">
+                               <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center text-xl">
+                                  {{ getIcon(record.actionType) }}
+                               </div>
+                               <div>
+                                  <div class="font-bold text-base-content">{{ record.actionType }}</div>
+                                  <div class="text-xs text-base-content/50 font-medium">{{ formatTime(record.date) }}</div>
+                               </div>
+                            </div>
+                            
+                            <div class="text-right pr-6">
+                               <div class="font-black text-lg text-base-content">{{ record.count }} <span class="text-xs font-medium text-base-content/40">次</span></div>
+                               <div class="text-xs font-bold text-primary">{{ record.kcal }} kcal</div>
+                            </div>
+            
+                            <!-- Delete Button -->
+                            <button 
+                               @click.stop="deleteRecord(record.id)"
+                               class="btn btn-ghost btn-xs text-error absolute -right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                               :class="{'opacity-100': deletingId === record.id}"
+                            >
+                               <span v-if="deletingId === record.id" class="loading loading-spinner loading-xs"></span>
+                               <span v-else>🗑️</span>
+                            </button>
+                         </div>
+                      </div>
+                   </div>
               </div>
 
-              <!-- Empty State -->
-              <div v-else-if="history.length === 0" class="pl-6 py-8 text-center text-base-content/40 italic">
-                 暂无运动记录，快去动起来吧！
-              </div>
-              
-              <!-- List -->
-              <div 
-                 v-else
-                 v-for="(record, index) in history.slice(0, 10)" 
-                 :key="record.id"
-                 class="relative pl-6 group"
-              >
-                 <!-- Timeline Dot -->
-                 <div class="absolute -left-[7px] top-6 w-4 h-4 rounded-full border-2 border-base-100" :class="index === 0 ? 'bg-primary ring-4 ring-primary/20' : 'bg-base-300'"></div>
-                 
-                 <!-- Content -->
-                 <div class="bg-base-100 p-4 rounded-2xl shadow-sm border border-base-100 flex justify-between items-center transition-transform">
-                    <div class="flex items-center gap-3">
-                       <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center text-xl">
-                          {{ getIcon(record.actionType) }}
-                       </div>
-                       <div>
-                          <div class="font-bold text-base-content">{{ record.actionType }}</div>
-                          <div class="text-xs text-base-content/50 font-medium">{{ formatTime(record.date) }}</div>
-                       </div>
-                    </div>
-                    
-                    <div class="text-right pr-6">
-                       <div class="font-black text-lg text-base-content">{{ record.count }} <span class="text-xs font-medium text-base-content/40">次</span></div>
-                       <div class="text-xs font-bold text-primary">{{ record.kcal }} kcal</div>
-                    </div>
-    
-                    <!-- Delete Button -->
-                    <button 
-                       @click.stop="deleteRecord(record.id)"
-                       class="btn btn-ghost btn-xs text-error absolute -right-0 top-1/2 -translate-y-1/2"
-                    >
-                       <span v-if="deletingId === record.id" class="loading loading-spinner loading-xs"></span>
-                       <span v-else>🗑️</span>
-                    </button>
-                 </div>
+              <!-- History Heatmap View -->
+              <div v-else class="transition-all duration-300 animate-fade-in">
+                  <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 overflow-hidden">
+                      <div class="overflow-x-auto pb-2 scrollbar-hide" style="direction: rtl;">
+                          <!-- Grid Container (Reversed direction for RTL to start from right) -->
+                          <div class="grid grid-rows-7 grid-flow-col gap-1 w-max ltr" style="direction: ltr;">
+                             <div 
+                                v-for="(day, index) in heatmapData" 
+                                :key="index"
+                                class="w-3 h-3 rounded-[2px] transition-colors hover:ring-2 ring-primary/50 relative group cursor-pointer"
+                                :class="[day.color, {'invisible': day.invisible}]"
+                             >
+                                <!-- Tooltip -->
+                                <div v-if="!day.invisible" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
+                                    {{ day.date }}: {{ day.count }} 组
+                                </div>
+                             </div>
+                          </div>
+                      </div>
+                      
+                      <!-- Legend -->
+                      <div class="flex items-center justify-end gap-2 mt-4 text-xs text-base-content/40">
+                          <span>少</span>
+                          <div class="w-3 h-3 rounded-[2px] bg-base-200"></div>
+                          <div class="w-3 h-3 rounded-[2px] bg-green-200"></div>
+                          <div class="w-3 h-3 rounded-[2px] bg-green-400"></div>
+                          <div class="w-3 h-3 rounded-[2px] bg-green-600"></div>
+                          <span>多</span>
+                      </div>
+                  </div>
+
+                  <!-- Stats Card -->
+                  <div class="mt-4 p-5 bg-gradient-to-br from-base-100 to-base-200 rounded-3xl border border-base-100 shadow-sm">
+                      <div class="flex items-center gap-3 mb-2">
+                          <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">📊</div>
+                          <h4 class="font-bold text-base-content/80">本月统计</h4>
+                      </div>
+                      <p class="text-base-content font-medium leading-relaxed">
+                          {{ historyStatsText }}
+                      </p>
+                  </div>
               </div>
            </div>
         </div>
@@ -581,12 +650,18 @@
       setup() {
         const authStore = useAuthStore();
         const history = ref([]);
+        const allHistory = ref([]);
+        const historyMode = ref('today'); // 'today' or 'history'
         const isModalOpen = ref(false);
         const isRestTimerOpen = ref(false);
         const currentAction = ref({});
         const loading = ref(false);
         const initLoading = ref(true);
         const deletingId = ref(null);
+        
+        // Touch handling
+        const touchStartX = ref(0);
+        const touchEndX = ref(0);
         
         const actions = [
           { id: 'pull_ups', name: '引体向上', kcal: 0.5, icon: '💪', color: 'bg-blue-100 text-blue-600' },
@@ -596,10 +671,10 @@
         ];
 
         onMounted(async () => {
-          await fetchHistory();
+          await fetchHistory('today');
         });
 
-        const fetchHistory = async () => {
+        const fetchHistory = async (range = 'today') => {
             const config = authStore.userConfig?.configuration;
             const userId = authStore.userConfig?.userId;
             
@@ -612,25 +687,20 @@
                 const response = await axios.post('/api/get-history', {
                     userId: userId,
                     appToken: config.fs_app_token,
-                    tableId: config.fs_table_id
+                    tableId: config.fs_table_id,
+                    range: range
                 });
 
-                console.log("Raw history from API:", response.data.data); // Debug log
-
                 if (response.data.success) {
-                    history.value = response.data.data.map(item => {
+                    const mappedData = response.data.data.map(item => {
                         const fields = item.fields;
                         const actionId = fields.training_types;
                         const action = actions.find(a => a.id === actionId);
                         
-                        // Calculate kcal if not present
                         let kcal = fields.Kcal_Burned;
                         if (!kcal && action) {
                             kcal = (fields.count * action.kcal).toFixed(1);
                         }
-
-                        // Debug: check date
-                        // console.log("Item date:", item.createdTime);
 
                         return {
                             id: item.id,
@@ -640,6 +710,12 @@
                             kcal: kcal || 0
                         };
                     });
+
+                    if (range === 'today') {
+                        history.value = mappedData;
+                    } else {
+                        allHistory.value = mappedData;
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch history:', error);
@@ -647,6 +723,90 @@
                 initLoading.value = false;
             }
         };
+
+        const switchHistoryMode = async (mode) => {
+            if (mode === historyMode.value) return;
+            historyMode.value = mode;
+            if (mode === 'history' && allHistory.value.length === 0) {
+                await fetchHistory('all');
+            }
+        };
+
+        const onTouchStart = (e) => {
+            touchStartX.value = e.changedTouches[0].screenX;
+        };
+
+        const onTouchEnd = (e) => {
+            touchEndX.value = e.changedTouches[0].screenX;
+            handleSwipe();
+        };
+
+        const handleSwipe = () => {
+            if (touchEndX.value < touchStartX.value - 50) {
+                // Swipe Left -> Show History
+                switchHistoryMode('history');
+            }
+            if (touchEndX.value > touchStartX.value + 50) {
+                // Swipe Right -> Show Today
+                switchHistoryMode('today');
+            }
+        };
+
+        const heatmapData = computed(() => {
+             if (allHistory.value.length === 0) return [];
+             
+             // Generate last 365 days
+             const days = [];
+             const today = new Date();
+             const oneYearAgo = new Date();
+             oneYearAgo.setDate(today.getDate() - 364);
+             
+             // Pad start to align with day of week (assuming Row 1 is Sunday)
+             const startDay = oneYearAgo.getDay(); // 0-6
+             for (let i = 0; i < startDay; i++) {
+                 days.push({ date: '', count: 0, color: 'bg-transparent', invisible: true });
+             }
+
+             // Create map of date -> count
+             const activityMap = {};
+             allHistory.value.forEach(record => {
+                 const dateStr = new Date(record.date).toDateString();
+                 if (!activityMap[dateStr]) activityMap[dateStr] = 0;
+                 activityMap[dateStr]++;
+             });
+ 
+             for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
+                 const dateStr = d.toDateString();
+                 const count = activityMap[dateStr] || 0;
+                 let color = 'bg-base-200'; // default gray
+                 if (count > 0) color = 'bg-green-200';
+                 if (count > 2) color = 'bg-green-400';
+                 if (count > 5) color = 'bg-green-600';
+                 
+                 days.push({
+                     date: d.toLocaleDateString(),
+                     count,
+                     color,
+                     invisible: false
+                 });
+             }
+             return days;
+         });
+
+        const historyStatsText = computed(() => {
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            
+            const thisMonthRecords = allHistory.value.filter(record => {
+                const d = new Date(record.date);
+                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            });
+
+            const uniqueDays = new Set(thisMonthRecords.map(r => new Date(r.date).toDateString())).size;
+            const totalSets = thisMonthRecords.length;
+
+            return `本月共运动 ${uniqueDays} 天，完成运动 ${totalSets} 组`;
+        });
 
         const todayRecords = computed(() => {
           const today = new Date().toDateString();
@@ -792,7 +952,14 @@
           formatTime, 
           userInitial, 
           deletingId,
-          isRestTimerOpen
+          isRestTimerOpen,
+          historyMode,
+          switchHistoryMode,
+          onTouchStart,
+          onTouchEnd,
+          heatmapData,
+          historyStatsText,
+          allHistory
         };
       }
     });

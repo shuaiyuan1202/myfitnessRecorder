@@ -102,7 +102,7 @@ export async function searchUserInTable(accessToken, appToken, tableId, username
   }
 }
 
-export async function getRecords(accessToken, appToken, tableId, userId) {
+export async function getRecords(accessToken, appToken, tableId, userId, range = 'today') {
   // Use Search records API (POST) which supports "Today" filter for Date fields
   // This avoids timezone issues and simplifies the logic.
   
@@ -137,22 +137,27 @@ export async function getRecords(accessToken, appToken, tableId, userId) {
   }
 
   // 2. Construct Filter Object for Search API
-  // Using "Today" relative date filter as requested
+  const conditions = [
+      {
+          field_name: userField,
+          operator: "is",
+          value: [userId]
+      }
+  ];
+
+  // Only add time filter if range is 'today'
+  if (range === 'today') {
+      conditions.push({
+          field_name: timeField,
+          operator: "is",
+          value: ["Today"]
+      });
+  }
+
   const requestBody = {
       filter: {
           conjunction: "and",
-          conditions: [
-              {
-                  field_name: userField,
-                  operator: "is",
-                  value: [userId]
-              },
-              {
-                  field_name: timeField,
-                  operator: "is",
-                  value: ["Today"]
-              }
-          ]
+          conditions: conditions
       },
       sort: [
           {
@@ -170,7 +175,7 @@ export async function getRecords(accessToken, appToken, tableId, userId) {
       requestBody,
       {
         params: {
-            page_size: 100 // Limit to 100 records for today
+            page_size: range === 'all' ? 500 : 100 // Limit to 500 for all history, 100 for today
         },
         headers: {
           Authorization: `Bearer ${accessToken}`,

@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, appToken, tableId} = req.body;
+  const { userId, appToken, tableId, range } = req.body;
 
   if (!userId || !appToken || !tableId) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   try {
     const accessToken = await getTenantAccessToken();
-    const records = await getRecords(accessToken, appToken, tableId, userId);
+    const records = await getRecords(accessToken, appToken, tableId, userId, range);
     
     return res.status(200).json({ success: true, data: records });
   } catch (error) {
