@@ -94,10 +94,40 @@ export async function searchUserInTable(accessToken, appToken, tableId, username
             configuration: config
         };
     }
-    return null;
-
+    return [];
   } catch (error) {
     console.error('Error searching user:', error.response?.data || error);
+    throw error;
+  }
+}
+
+export async function getActionList(accessToken, appToken, tableId) {
+  const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
+
+  try {
+    const response = await axios.get(url, {
+      params: {
+        page_size: 500 // Fetch all actions (assuming < 500)
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.data.code !== 0) {
+      console.error('Get action list failed:', response.data);
+      throw new Error(`Feishu Get Actions Error: ${response.data.msg}`);
+    }
+
+    if (response.data.data && response.data.data.items) {
+      return response.data.data.items.map(item => ({
+        id: item.record_id,
+        ...item.fields
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error getting action list:', error.response?.data || error);
     throw error;
   }
 }

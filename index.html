@@ -189,20 +189,32 @@
                 <div class="px-6 mb-8">
                    <div class="flex items-center justify-between mb-4">
                      <h3 class="font-bold text-lg text-base-content/90">快速记录</h3>
+                     <button @click="fetchActions(true)" class="btn btn-ghost btn-xs text-primary" :class="{'loading': actionsLoading}">
+                        <span v-if="!actionsLoading">↻</span>
+                     </button>
                    </div>
                    
-                   <div class="grid grid-cols-3 gap-4">
-                      <button 
-                         v-for="action in actions" 
-                         :key="action.id"
-                         @click="openModal(action)"
-                         class="flex flex-col items-center justify-center gap-3 p-4 bg-base-100 rounded-3xl shadow-sm border border-base-100 hover:border-primary/30 hover:shadow-md active:scale-95 transition-all group h-32"
-                      >
-                         <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-transform group-hover:-translate-y-1" :class="action.color">
-                            {{ action.icon }}
-                         </div>
-                         <span class="text-xs font-bold text-base-content/70 group-hover:text-primary transition-colors">{{ action.name }}</span>
-                      </button>
+                   <div v-if="actionsLoading && allActions.length === 0" class="flex justify-center py-8">
+                       <span class="loading loading-spinner text-primary"></span>
+                   </div>
+
+                   <div v-else class="space-y-6">
+                       <div v-for="(group, groupName) in groupedActions" :key="groupName">
+                           <h4 class="font-bold text-xs text-base-content/40 mb-3 uppercase tracking-wider px-1">{{ groupName }}</h4>
+                           <div class="grid grid-cols-3 gap-4">
+                              <button 
+                                 v-for="action in group" 
+                                 :key="action.id"
+                                 @click="openModal(action)"
+                                 class="flex flex-col items-center justify-center gap-3 p-4 bg-base-100 rounded-3xl shadow-sm border border-base-100 hover:border-primary/30 hover:shadow-md active:scale-95 transition-all group h-32"
+                              >
+                                 <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-transform group-hover:-translate-y-1" :class="action.color || 'bg-primary/5 text-primary'">
+                                    {{ action.icon || '🏋️' }}
+                                 </div>
+                                 <span class="text-xs font-bold text-base-content/70 group-hover:text-primary transition-colors">{{ action.label }}</span>
+                              </button>
+                           </div>
+                       </div>
                    </div>
                 </div>
 
@@ -317,9 +329,9 @@
             </div>
 
             <!-- PUMP TAB -->
-            <div v-else-if="activeTab === 'pump'" class="h-full relative flex flex-col items-center justify-center overflow-hidden bg-base-100 animate-fade-in">
+            <div v-else-if="activeTab === 'pump'" class="h-full relative flex flex-col items-center justify-center overflow-hidden bg-base-100 animate-fade-in" style="background-color: inherit;">
                 <!-- Swipeable Cards Container -->
-                <div class="relative w-full max-w-sm h-[60vh] flex items-center justify-center perspective-1000">
+                <div class="relative w-full max-w-md h-[65vh] flex items-center justify-center perspective-1000">
                     
                     <div v-if="pumpLoading" class="loading loading-spinner loading-lg text-primary"></div>
                     
@@ -330,7 +342,7 @@
 
                     <div 
                         v-else
-                        class="absolute w-full h-full p-6"
+                        class="absolute w-full h-full p-4"
                         :style="cardStyle"
                         @touchstart="onCardTouchStart"
                         @touchmove="onCardTouchMove"
@@ -343,25 +355,41 @@
                         <!-- Card -->
                         <div class="w-full h-full bg-white rounded-[2rem] shadow-2xl border border-base-200 flex flex-col overflow-hidden relative select-none cursor-grab active:cursor-grabbing">
                             <!-- Cover Image -->
-                            <div v-if="currentCard.cover" class="h-1/2 w-full bg-gray-100 overflow-hidden">
+                            <div v-if="currentCard.cover" class="h-1/2 w-full bg-gray-100 overflow-hidden relative">
                                 <img :src="currentCard.cover" class="w-full h-full object-cover pointer-events-none" alt="Cover">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                                <div class="absolute bottom-4 left-4 right-4">
+                                     <span class="inline-block px-3 py-1 bg-primary/90 text-primary-content text-xs font-bold rounded-full backdrop-blur-sm mb-1">
+                                        {{ currentCard.category }}
+                                     </span>
+                                </div>
                             </div>
-                            <div v-else class="h-1/2 w-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
-                                <span class="text-6xl">⚡️</span>
+                            <!-- No Cover State -->
+                            <div v-else class="h-1/3 w-full bg-gradient-to-br from-base-200 to-base-100 flex items-center justify-center relative">
+                                <div class="absolute bottom-4 left-4">
+                                     <span class="inline-block px-3 py-1 bg-base-300 text-base-content/60 text-xs font-bold rounded-full mb-1">
+                                        {{ currentCard.category }}
+                                     </span>
+                                </div>
                             </div>
 
                             <!-- Content -->
-                            <div class="flex-1 p-8 flex flex-col items-center justify-center text-center bg-white relative z-10">
-                                <div class="badge badge-outline mb-4 opacity-50">{{ currentCard.category || '精选' }}</div>
-                                <h2 class="text-3xl font-black text-black mb-4 leading-tight">{{ currentCard.title || '无标题' }}</h2>
-                                <p class="text-base-content/60 font-medium line-clamp-3">{{ currentCard.content }}</p>
+                            <div class="flex-1 p-8 flex flex-col justify-center text-center relative">
+                                <h3 
+                                    class="font-normal text-base-content mb-6 leading-tight"
+                                    :class="titleClass"
+                                >
+                                    {{ currentCard.title }}
+                                </h3>
+                                <p class="text-base-content/60 font-medium leading-relaxed text-lg line-clamp-4">{{ currentCard.content }}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="absolute bottom-8 text-xs text-base-content/30 font-medium text-center w-full px-6">
-                    氮泵量有限，功能测试中，敬请期待~
+                <!-- Footer Text -->
+                <div class="absolute bottom-24 text-center w-full px-6 opacity-40">
+                    <p class="text-xs font-medium">氮泵量有限，功能测试中，敬请期待~</p>
                 </div>
             </div>
         </div>
@@ -393,7 +421,8 @@
 
         <number-selector-modal 
           :is-open="isModalOpen" 
-          :title="currentAction.name" 
+          :title="currentAction.label" 
+          :description="currentAction.description"
           :kcal-per-rep="currentAction.kcal" 
           :loading="loading"
           @close="closeModal" 
@@ -420,7 +449,8 @@
           
           <div class="text-center mb-8">
              <h3 class="text-2xl font-black text-base-content mb-1">{{ title }}</h3>
-             <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wide">
+             <p v-if="description" class="text-sm text-base-content/60 font-medium mb-2 px-8 leading-relaxed">{{ description }}</p>
+             <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wide mt-1">
                 <span>🔥</span>
                 <span>{{ kcalPerRep }} 千卡 / 次</span>
              </div>
@@ -562,7 +592,7 @@
     // NumberSelectorModal
     const NumberSelectorModal = defineComponent({
       template: '#modal-template',
-      props: ['isOpen', 'title', 'kcalPerRep', 'loading'], 
+      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading'], 
       emits: ['close', 'confirm'],
       setup(props, { emit }) {
         const count = ref(10);
@@ -738,14 +768,88 @@
         // const touchStartX = ref(0);
         // const touchEndX = ref(0);
         
-        const actions = [
-          { id: 'pull_ups', name: '引体向上', kcal: 0.5, icon: '💪', color: 'bg-blue-100 text-blue-600' },
-          { id: 'push_ups', name: '俯卧撑', kcal: 0.2, icon: '🤸', color: 'bg-purple-100 text-purple-600' },
-          { id: 'crunches', name: '卷腹', kcal: 0.1, icon: '🧘', color: 'bg-orange-100 text-orange-600' },
-          { id: 'plank', name: '平板支撑', kcal: 0.4, icon: '💪', color: 'bg-orange-100 text-orange-600' }
-        ];
+        const allActions = ref([]);
+        const actionsLoading = ref(false);
+
+        const fetchActions = async (force = false) => {
+            actionsLoading.value = true;
+            try {
+                // Check cache
+                const cached = localStorage.getItem('cachedActions');
+                if (!force && cached) {
+                    allActions.value = JSON.parse(cached);
+                    // If we have cache, we can still fetch in background to update, or just return.
+                    // For now, if we have cache, we assume it's good unless forced.
+                    if (allActions.value.length > 0) {
+                        actionsLoading.value = false;
+                        return;
+                    }
+                }
+
+                const response = await axios.get('/api/get-actions');
+                if (response.data.success) {
+                    const mapped = response.data.data.map(item => {
+                        
+                        const name = item.name || 'Unknown';
+                        const label = item.label || item.name;// 如果没有 label 就用 name 兜底
+                        const desc = item.description || '';
+                        const muscle = item.target_muscle_group || '其他';
+                        // 截图里 category 是个数组 ["自由重量", "居家"]，如果有用到也可以取
+                        // category: item.category || []
+                        
+                        // Assign icon/color based on muscle or random
+                        let icon = '🏋️';
+                        let color = 'bg-primary/5 text-primary';
+                        
+                        if (muscle.includes('胸')) { icon = '💪'; color = 'bg-blue-100 text-blue-600'; }
+                        else if (muscle.includes('背')) { icon = '🦍'; color = 'bg-purple-100 text-purple-600'; }
+                        else if (muscle.includes('腿') || muscle.includes('Leg')) { icon = '🦵'; color = 'bg-orange-100 text-orange-600'; }
+                        else if (muscle.includes('腹') || muscle.includes('Abs')) { icon = '🧘'; color = 'bg-green-100 text-green-600'; }
+                        else if (muscle.includes('肩')) { icon = '🤷'; color = 'bg-red-100 text-red-600'; }
+                        else if (muscle.includes('臂')) { icon = '🦾'; color = 'bg-indigo-100 text-indigo-600'; }
+
+                        return {
+                            id: item.id,
+                            name: name, // English Name (for saving)
+                            label: label, // Chinese Label (for display)
+                            description: desc,
+                            target_muscle_group: muscle,
+                            kcal: 0.3, // Default
+                            icon: icon,
+                            color: color
+                        };
+                    });
+                    
+                    allActions.value = mapped;
+                    localStorage.setItem('cachedActions', JSON.stringify(mapped));
+                }
+            } catch (e) {
+                console.error('Failed to fetch actions:', e);
+                // Fallback to hardcoded if empty?
+                if (allActions.value.length === 0) {
+                     allActions.value = [
+                        { id: 'pull_ups', name: 'Pull Up', label: '引体向上', kcal: 0.5, icon: '💪', color: 'bg-blue-100 text-blue-600', target_muscle_group: '背部' },
+                        { id: 'push_ups', name: 'Push Up', label: '俯卧撑', kcal: 0.2, icon: '🤸', color: 'bg-purple-100 text-purple-600', target_muscle_group: '胸部' }
+                     ];
+                }
+            } finally {
+                actionsLoading.value = false;
+            }
+        };
+
+        const groupedActions = computed(() => {
+            const groups = {};
+            // Sort by muscle group to ensure consistent order if needed
+            allActions.value.forEach(action => {
+                const groupName = action.target_muscle_group || '其他';
+                if (!groups[groupName]) groups[groupName] = [];
+                groups[groupName].push(action);
+            });
+            return groups;
+        });
 
         onMounted(async () => {
+          await fetchActions();
           await fetchHistory('today');
         });
 
@@ -771,8 +875,13 @@
                 if (response.data.success) {
                     const mappedData = response.data.data.map(item => {
                         const fields = item.fields;
-                        const actionId = fields.training_types;
-                        const action = actions.find(a => a.id === actionId);
+                        // Handle Feishu text field format (array of objects or direct string)
+                        let actionId = fields.training_types;
+                        if (Array.isArray(actionId) && actionId.length > 0 && actionId[0].text) {
+                            actionId = actionId[0].text;
+                        }
+                        
+                        const action = allActions.value.find(a => a.name === actionId || a.label === actionId || a.id === actionId);
                         
                         let kcal = fields.Kcal_Burned;
                         if (!kcal && action) {
@@ -782,7 +891,7 @@
                         return {
                             id: item.id,
                             date: item.createdTime,
-                            actionType: action ? action.name : actionId,
+                            actionType: action ? action.label : actionId,
                             count: fields.count,
                             kcal: kcal || 0
                         };
@@ -859,6 +968,17 @@
                 transform: `translate(${cardX.value}px, ${cardY.value}px) rotate(${cardRotation.value}deg)`,
                 transition: transition
             };
+        });
+
+        const titleClass = computed(() => {
+            const title = currentCard.value.title || '';
+            const len = title.length;
+            
+            if (len <= 4) return 'text-5xl';
+            if (len <= 8) return 'text-4xl';
+            if (len <= 15) return 'text-3xl';
+            if (len <= 25) return 'text-2xl';
+            return 'text-xl';
         });
 
         // Card Swipe Handlers
@@ -1036,7 +1156,7 @@
                   userId: userId,
                   appToken: config.fs_app_token,
                   tableId: config.fs_table_id,
-                  trainingType: currentAction.value.id,
+                  trainingType: currentAction.value.name,
                   count: count
                 });
                 
@@ -1109,12 +1229,12 @@
         });
 
         const getIcon = (name) => {
-          const action = actions.find(a => a.name === name);
+          const action = allActions.value.find(a => a.label === name || a.name === name);
           return action ? action.icon : '📝';
         };
 
         const getActionColor = (name) => {
-            const action = actions.find(a => a.name === name);
+            const action = allActions.value.find(a => a.label === name || a.name === name);
             return action ? action.color : 'bg-gray-100 text-gray-600';
         }
 
@@ -1129,7 +1249,10 @@
           currentAction, 
           loading, 
           initLoading, 
-          actions,
+          allActions,
+          groupedActions,
+          fetchActions,
+          actionsLoading,
           todayRecords, 
           todayKcal, 
           todaySets,
@@ -1149,6 +1272,7 @@
           heatmapData,
           historyStatsText,
           allHistory,
+          historyLoading, // Added this
           // Pump
           pumpData,
           currentCard,
@@ -1157,7 +1281,8 @@
           onCardTouchStart,
           onCardTouchMove,
           onCardTouchEnd,
-          fetchPumpData
+          fetchPumpData,
+          titleClass
         };
       }
     });
