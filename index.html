@@ -1093,7 +1093,11 @@
                     });
 
                     if (range === 'today') {
-                        history.value = mappedData;
+                        const todayStr = new Date().toDateString();
+                        history.value = mappedData.filter(item => {
+                            const d = new Date(item.date);
+                            return d.toDateString() === todayStr;
+                        });
                     } else {
                         allHistory.value = mappedData;
                     }
