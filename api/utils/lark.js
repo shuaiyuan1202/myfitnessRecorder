@@ -94,45 +94,15 @@ export async function searchUserInTable(accessToken, appToken, tableId, username
             configuration: config
         };
     }
-    return [];
+    return null;
+
   } catch (error) {
     console.error('Error searching user:', error.response?.data || error);
     throw error;
   }
 }
 
-export async function getActionList(accessToken, appToken, tableId) {
-  const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
-
-  try {
-    const response = await axios.get(url, {
-      params: {
-        page_size: 500 // Fetch all actions (assuming < 500)
-      },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (response.data.code !== 0) {
-      console.error('Get action list failed:', response.data);
-      throw new Error(`Feishu Get Actions Error: ${response.data.msg}`);
-    }
-
-    if (response.data.data && response.data.data.items) {
-      return response.data.data.items.map(item => ({
-        id: item.record_id,
-        ...item.fields
-      }));
-    }
-    return [];
-  } catch (error) {
-    console.error('Error getting action list:', error.response?.data || error);
-    throw error;
-  }
-}
-
-export async function getRecords(accessToken, appToken, tableId, userId, range = 'today') {
+export async function getRecords(accessToken, appToken, tableId, userId) {
   // Use Search records API (POST) which supports "Today" filter for Date fields
   // This avoids timezone issues and simplifies the logic.
   
@@ -167,27 +137,16 @@ export async function getRecords(accessToken, appToken, tableId, userId, range =
   }
 
   // 2. Construct Filter Object for Search API
-  const conditions = [
-      {
-          field_name: userField,
-          operator: "is",
-          value: [userId]
-      }
-  ];
-
-  // Only add time filter if range is 'today'
-  if (range === 'today') {
-      conditions.push({
-          field_name: timeField,
-          operator: "is",
-          value: ["Today"]
-      });
-  }
-
   const requestBody = {
       filter: {
           conjunction: "and",
-          conditions: conditions
+          conditions: [
+              {
+                  field_name: userField,
+                  operator: "is",
+                  value: [userId]
+              }
+          ]
       },
       sort: [
           {
@@ -205,7 +164,7 @@ export async function getRecords(accessToken, appToken, tableId, userId, range =
       requestBody,
       {
         params: {
-            page_size: range === 'all' ? 500 : 100 // Limit to 500 for all history, 100 for today
+            page_size: 100 // Limit to 100 records
         },
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -231,39 +190,6 @@ export async function getRecords(accessToken, appToken, tableId, userId, range =
 
   } catch (error) {
     console.error('Error getting records:', error.response?.data || error);
-    throw error;
-  }
-}
-
-export async function getPumpData(accessToken, appToken, tableId, viewId) {
-  const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
-
-  try {
-    const response = await axios.get(url, {
-      params: {
-        view_id: viewId,
-        page_size: 100 // Fetch a batch to pick randomly from
-      },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (response.data.code !== 0) {
-      console.error('Get pump data failed:', response.data);
-      throw new Error(`Feishu Get Pump Data Error: ${response.data.msg}`);
-    }
-
-    if (response.data.data && response.data.data.items) {
-      return response.data.data.items.map(item => ({
-        id: item.record_id,
-        ...item.fields
-      }));
-    }
-    return [];
-
-  } catch (error) {
-    console.error('Error getting pump data:', error.response?.data || error);
     throw error;
   }
 }
@@ -311,6 +237,37 @@ export async function deleteRecord(accessToken, appToken, tableId, recordId) {
         return response.data;
     } catch (error) {
         console.error('Error deleting record:', error.response?.data || error);
+        throw error;
+    }
+}
+
+export async function getPumpData(accessToken, appToken, tableId) {
+    const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`;
+    
+    try {
+        const response = await axios.get(
+            url,
+            {
+                params: {
+                    page_size: 100
+                },
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                }
+            }
+        );
+        
+        if (response.data.code !== 0) {
+             console.error('Get pump data failed:', response.data);
+             throw new Error(`Feishu Get Pump Data Error: ${response.data.msg}`);
+        }
+        
+        if (response.data.data && response.data.data.items) {
+            return response.data.data.items.map(item => item.fields);
+        }
+        return [];
+    } catch (error) {
+        console.error('Error getting pump data:', error.response?.data || error);
         throw error;
     }
 }

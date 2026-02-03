@@ -17,6 +17,48 @@
   <!-- Tailwind & DaisyUI -->
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- TEMPLATE: Preference Selector Modal -->
+  <script type="text/x-template" id="preference-selector-template">
+    <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="close"></div>
+        <div class="relative w-full max-w-lg bg-base-100 rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl transform transition-transform animate-slide-up h-[70vh] flex flex-col">
+            <div class="w-12 h-1.5 bg-base-300 rounded-full mx-auto mb-6 opacity-50 flex-shrink-0"></div>
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <h3 class="text-xl font-black text-base-content">添加{{ category }}训练</h3>
+                <button class="btn btn-sm btn-circle btn-ghost" @click="close">✕</button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto scrollbar-hide grid grid-cols-3 gap-3 content-start pb-24">
+                <button 
+                    v-for="action in actions" 
+                    :key="action.id"
+                    @click="toggle(action.id)"
+                    class="flex flex-col items-center justify-center p-3 rounded-2xl transition-all border-2 relative h-28"
+                    :class="isSelected(action.id) ? 'bg-primary/10 border-primary' : 'bg-base-200 border-transparent opacity-60 hover:opacity-100'"
+                >
+                    <div class="text-3xl mb-2">{{ action.icon }}</div>
+                    <div class="text-xs font-bold text-center leading-tight line-clamp-2">{{ action.label }}</div>
+                    <div v-if="isSelected(action.id)" class="absolute top-2 right-2 text-primary bg-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] shadow-sm">✓</div>
+                </button>
+                <div v-if="actions.length === 0" class="col-span-3 text-center py-10 text-base-content/40">
+                    暂无此类动作
+                </div>
+            </div>
+
+            <div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-base-100 via-base-100 to-transparent">
+                <button 
+                    class="btn btn-primary btn-lg w-full rounded-2xl font-bold shadow-xl shadow-primary/20" 
+                    @click="save"
+                    :disabled="loading"
+                >
+                    <span v-if="loading" class="loading loading-spinner"></span>
+                    <span v-else>保存设置</span>
+                </button>
+            </div>
+        </div>
+    </div>
+  </script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -194,27 +236,44 @@
                      </button>
                    </div>
                    
+                   <!-- Category Tabs -->
+                   <div class="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-hide">
+                       <button 
+                           v-for="cat in categories" 
+                           :key="cat"
+                           @click="activeCategory = cat"
+                           class="btn btn-sm rounded-full transition-all border-none flex-shrink-0"
+                           :class="activeCategory === cat ? 'bg-primary text-primary-content shadow-md shadow-primary/30' : 'bg-base-200 text-base-content/60'"
+                       >
+                           {{ cat }}
+                       </button>
+                   </div>
+
                    <div v-if="actionsLoading && allActions.length === 0" class="flex justify-center py-8">
                        <span class="loading loading-spinner text-primary"></span>
                    </div>
 
-                   <div v-else class="space-y-6">
-                       <div v-for="(group, groupName) in groupedActions" :key="groupName">
-                           <h4 class="font-bold text-xs text-base-content/40 mb-3 uppercase tracking-wider px-1">{{ groupName }}</h4>
-                           <div class="grid grid-cols-3 gap-4">
-                              <button 
-                                 v-for="action in group" 
-                                 :key="action.id"
-                                 @click="openModal(action)"
-                                 class="flex flex-col items-center justify-center gap-3 p-4 bg-base-100 rounded-3xl shadow-sm border border-base-100 hover:border-primary/30 hover:shadow-md active:scale-95 transition-all group h-32"
-                              >
-                                 <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-transform group-hover:-translate-y-1" :class="action.color || 'bg-primary/5 text-primary'">
-                                    {{ action.icon || '🏋️' }}
-                                 </div>
-                                 <span class="text-xs font-bold text-base-content/70 group-hover:text-primary transition-colors">{{ action.label }}</span>
-                              </button>
-                           </div>
-                       </div>
+                   <div v-else class="grid grid-cols-4 gap-3">
+                      <button 
+                         v-for="action in filteredPreferredActions" 
+                         :key="action.id"
+                         @click="openModal(action)"
+                         class="flex flex-col items-center justify-center p-2 rounded-2xl bg-base-100 border border-base-200 shadow-sm active:scale-95 transition-all h-28 relative group"
+                      >
+                         <div class="w-10 h-10 rounded-full flex items-center justify-center text-xl mb-1" :class="action.color">
+                             {{ action.icon }}
+                         </div>
+                         <div class="text-[10px] font-bold text-center leading-tight text-base-content/80 line-clamp-2">{{ action.label }}</div>
+                      </button>
+
+                      <!-- Add Button (Weak) -->
+                      <button 
+                          @click="openPreferenceModal"
+                          class="flex flex-col items-center justify-center p-2 rounded-2xl border-2 border-dashed border-base-300 text-base-content/30 hover:border-primary/50 hover:text-primary transition-all h-28"
+                      >
+                          <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center text-xl mb-1">+</div>
+                          <div class="text-[10px] font-bold">添加</div>
+                      </button>
                    </div>
                 </div>
 
@@ -428,6 +487,16 @@
           @close="closeModal" 
           @confirm="handleConfirm" 
         ></number-selector-modal>
+
+        <preference-selector-modal
+          :is-open="isPreferenceModalOpen"
+          :category="activeCategory"
+          :actions="currentCategoryActions"
+          :initial-selected="initialModalSelected"
+          :loading="preferenceSaving"
+          @close="closePreferenceModal"
+          @save="savePreferences"
+        ></preference-selector-modal>
 
         <rest-timer-modal 
           :is-open="isRestTimerOpen" 
@@ -690,9 +759,49 @@
 
         onUnmounted(() => {
             stopTimer();
-        });
+            });
 
         return { timeLeft, totalTime, stop };
+      }
+    });
+
+    // Preference Selector Modal
+    const PreferenceSelectorModal = defineComponent({
+      template: '#preference-selector-template',
+      props: ['isOpen', 'category', 'actions', 'initialSelected', 'loading'],
+      emits: ['close', 'save'],
+      setup(props, { emit }) {
+        const selectedIds = ref([]);
+
+        watch(() => props.isOpen, (newVal) => {
+            if (newVal) {
+                selectedIds.value = [...props.initialSelected];
+            }
+        });
+
+        const toggle = (id) => {
+            if (navigator.vibrate) navigator.vibrate(50);
+            const index = selectedIds.value.indexOf(id);
+            if (index > -1) {
+                selectedIds.value.splice(index, 1);
+            } else {
+                selectedIds.value.push(id);
+            }
+        };
+
+        const isSelected = (id) => selectedIds.value.includes(id);
+
+        const save = () => {
+            emit('save', selectedIds.value);
+        };
+
+        const close = () => {
+            if (!props.loading) {
+                emit('close');
+            }
+        };
+
+        return { toggle, isSelected, save, close };
       }
     });
 
@@ -739,7 +848,7 @@
     // Dashboard
     const Dashboard = defineComponent({
       template: '#dashboard-template',
-      components: { NumberSelectorModal, RestTimerModal },
+      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal },
       setup() {
         const authStore = useAuthStore();
         const history = ref([]);
@@ -770,6 +879,92 @@
         
         const allActions = ref([]);
         const actionsLoading = ref(false);
+
+        // --- Preference Logic ---
+        const categories = ['背', '胸', '肩', '腿', '核心', '手臂'];
+        const activeCategory = ref('背');
+        const preferredActions = ref([]); // List of action IDs
+        const isPreferenceModalOpen = ref(false);
+        const preferenceSaving = ref(false);
+
+        // Load preferred actions
+        onMounted(() => {
+            const config = authStore.userConfig;
+            if (config && config.preferredAction && Array.isArray(config.preferredAction)) {
+                preferredActions.value = config.preferredAction;
+            } else {
+                const local = localStorage.getItem('preferredActions');
+                if (local) {
+                    try {
+                        preferredActions.value = JSON.parse(local);
+                    } catch(e) {}
+                }
+            }
+        });
+
+        const getCategoryMatch = (action, category) => {
+            const cat = action.target_muscle_group || '';
+            return cat.includes(category) || 
+                   (category === '腿' && cat.includes('Leg')) ||
+                   (category === '核心' && (cat.includes('腹') || cat.includes('Abs'))) ||
+                   (category === '手臂' && cat.includes('臂'));
+        };
+
+        // Computed: Actions in current category that are preferred
+        const filteredPreferredActions = computed(() => {
+            return allActions.value.filter(a => {
+                const matchCategory = getCategoryMatch(a, activeCategory.value);
+                return matchCategory && preferredActions.value.includes(a.id);
+            });
+        });
+
+        // Computed: All actions in current category (for modal)
+        const currentCategoryActions = computed(() => {
+            return allActions.value.filter(a => {
+                return getCategoryMatch(a, activeCategory.value);
+            });
+        });
+        
+        // Computed: Initial selected IDs for modal
+        const initialModalSelected = computed(() => {
+            // We want to pass IDs that are currently preferred AND in this category
+            // But actually, the modal should show ALL preferred IDs for this category as selected.
+            // Which is exactly what filteredPreferredActions contains.
+            return filteredPreferredActions.value.map(a => a.id);
+        });
+
+        const openPreferenceModal = () => {
+            isPreferenceModalOpen.value = true;
+        };
+
+        const closePreferenceModal = () => {
+            isPreferenceModalOpen.value = false;
+        };
+
+        const savePreferences = async (selectedIds) => {
+            preferenceSaving.value = true;
+            try {
+                // Remove existing prefs for this category
+                const currentCatActionIds = currentCategoryActions.value.map(a => a.id);
+                const otherPreferences = preferredActions.value.filter(id => !currentCatActionIds.includes(id));
+                
+                // Add new prefs
+                const newPreferredActions = [...otherPreferences, ...selectedIds];
+                preferredActions.value = newPreferredActions;
+
+                // Save locally
+                localStorage.setItem('preferredActions', JSON.stringify(newPreferredActions));
+                
+                // Sync to Cloud logic removed per request
+                
+                closePreferenceModal();
+            } catch (error) {
+                console.error('Failed to save preferences:', error);
+                alert('保存失败，请重试');
+            } finally {
+                preferenceSaving.value = false;
+            }
+        };
 
         const fetchActions = async (force = false) => {
             actionsLoading.value = true;
@@ -1273,6 +1468,17 @@
           historyStatsText,
           allHistory,
           historyLoading, // Added this
+          // Preferences
+          categories,
+          activeCategory,
+          filteredPreferredActions,
+          openPreferenceModal,
+          closePreferenceModal,
+          isPreferenceModalOpen,
+          currentCategoryActions,
+          initialModalSelected,
+          preferenceSaving,
+          savePreferences,
           // Pump
           pumpData,
           currentCard,
