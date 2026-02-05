@@ -1,33 +1,39 @@
-import { getTenantAccessToken, addRecord } from './utils/lark.js';
-import 'dotenv/config';
+import { sql } from './utils/db.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, appToken, tableId, trainingType, count } = req.body;
+  const { userId, trainingType, count } = req.body;
 
-  if (!userId || !appToken || !tableId || !trainingType || !count) {
+  if (!userId || !trainingType || !count) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
-    const accessToken = await getTenantAccessToken();
+    // Generate a random 9-digit ID (safe for Postgres Integer max 2,147,483,647)
+    let recordId;
+    let exists = true;
     
-    // Construct the record fields based on the schema
-    const fields = {
-        "user_id": userId,
-        "training_types": trainingType,
-        "count": count,
-        "record_time": new Date().getTime()
-    };
+    // Simple retry loop to ensure uniqueness
+    while (exists) {
+        // Range: 100,000,000 to 999,999,999
+        recordId = Math.floor(Math.random() * 900000000) + 100000000;
+        const { rows } = await sql`SELECT 1 FROM training_records WHERE id = ${recordId}`;
+        if (rows.length === 0) exists = false;
+    }
 
-    const result = await addRecord(accessToken, appToken, tableId, fields);
-    
-    return res.status(200).json({ success: true, data: result });
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    const result = await sql`
+      INSERT INTO training_records (id, user_id, training_types, count, created_at, record_time)
+      VALUES (${recordId}, ${userId}, ${trainingType}, ${count}, ${timestamp}, ${timestamp})
+      RETURNING *
+    `;
+    return res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Submit record error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 }

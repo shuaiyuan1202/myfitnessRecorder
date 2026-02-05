@@ -889,15 +889,20 @@
 
         // Load preferred actions
         onMounted(() => {
-            const config = authStore.userConfig;
-            if (config && config.preferredAction && Array.isArray(config.preferredAction)) {
-                preferredActions.value = config.preferredAction;
-            } else {
-                const local = localStorage.getItem('preferredActions');
-                if (local) {
-                    try {
-                        preferredActions.value = JSON.parse(local);
-                    } catch(e) {}
+            // Priority: LocalStorage -> UserConfig (fallback)
+            let loaded = false;
+            const local = localStorage.getItem('preferredActions');
+            if (local) {
+                try {
+                    preferredActions.value = JSON.parse(local);
+                    loaded = true;
+                } catch(e) {}
+            }
+            
+            if (!loaded) {
+                const config = authStore.userConfig;
+                if (config && config.preferredAction && Array.isArray(config.preferredAction) && config.preferredAction.length > 0) {
+                    preferredActions.value = config.preferredAction;
                 }
             }
         });
@@ -955,7 +960,7 @@
                 // Save locally
                 localStorage.setItem('preferredActions', JSON.stringify(newPreferredActions));
                 
-                // Sync to Cloud logic removed per request
+                // Cloud sync removed per user request - Local Storage Only
                 
                 closePreferenceModal();
             } catch (error) {
@@ -1004,7 +1009,7 @@
                         else if (muscle.includes('臂')) { icon = '🦾'; color = 'bg-indigo-100 text-indigo-600'; }
 
                         return {
-                            id: item.id,
+                            id: item.name, // Use name as unique ID since database has no ID column
                             name: name, // English Name (for saving)
                             label: label, // Chinese Label (for display)
                             description: desc,
@@ -1351,7 +1356,7 @@
             const userId = authStore.userConfig?.userId;
 
             if (config && userId) {
-                 await axios.post('/api/submit-record', {
+                 const response = await axios.post('/api/submit-record', {
                   userId: userId,
                   appToken: config.fs_app_token,
                   tableId: config.fs_table_id,
@@ -1359,8 +1364,34 @@
                   count: count
                 });
                 
-                // Refresh history from server to ensure data consistency and get the real record ID
-                await fetchHistory();
+                // Update local data directly instead of fetching from server
+                if (response.data.success) {
+                    const newRecord = response.data.data;
+                    const createdMs = newRecord.created_at * 1000; // Convert seconds to ms
+                    
+                    // Find action info for display
+                    const actionName = currentAction.value.name;
+                    const actionDef = allActions.value.find(a => a.name === actionName);
+                    
+                    // Calculate kcal
+                    const kcal = actionDef ? (newRecord.count * actionDef.kcal).toFixed(1) : 0;
+                    
+                    const localRecord = {
+                        id: newRecord.id,
+                        date: createdMs,
+                        actionType: actionDef ? actionDef.label : actionName,
+                        count: newRecord.count,
+                        kcal: kcal
+                    };
+                    
+                    // Add to today's history (assuming DESC order)
+                    history.value.unshift(localRecord);
+                    
+                    // Add to all history if it has been loaded
+                    if (allHistory.value.length > 0) {
+                        allHistory.value.unshift(localRecord);
+                    }
+                }
                 
                 // Play finish sound
                 const audio = new Audio('resources/finish.mp3');

@@ -1,8 +1,4 @@
-import { getTenantAccessToken, searchUserInTable } from './utils/lark.js';
-import 'dotenv/config';
-
-const LARK_MASTER_BASE_ID = process.env.LARK_MASTER_BASE_ID;
-const LARK_USER_TABLE_ID = process.env.LARK_USER_TABLE_ID;
+import { sql } from './utils/db.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,23 +12,52 @@ export default async function handler(req, res) {
   }
 
   try {
-    const accessToken = await getTenantAccessToken();
-    const userConfig = await searchUserInTable(accessToken, LARK_MASTER_BASE_ID, LARK_USER_TABLE_ID, username, password);
+    const { rows } = await sql`
+      SELECT user_id, username, name, configuration, preferred_action 
+      FROM "User" 
+      WHERE username = ${username} AND password = ${password}
+    `;
 
-    if (userConfig) {
-      return res.status(200).json({ success: true, userConfig });
+    if (rows.length > 0) {
+      const user = rows[0];
+      let config = user.configuration || {};
+      if (typeof config === 'string') {
+          try {
+              config = JSON.parse(config);
+          } catch (e) {
+              config = {};
+          }
+      }
+      if (!config.fs_app_token) config.fs_app_token = 'migrated_to_postgres';
+      if (!config.fs_table_id) config.fs_table_id = 'migrated_to_postgres';
+
+      let preferredAction = user.preferred_action || [];
+      if (typeof preferredAction === 'string') {
+          try {
+              preferredAction = JSON.parse(preferredAction);
+          } catch (e) {
+              preferredAction = [];
+          }
+      }
+
+      return res.status(200).json({ 
+        success: true, 
+        userConfig: {
+          userId: user.user_id,
+          username: user.username,
+          nickname: user.name,
+          configuration: config,
+          preferredAction: preferredAction
+        }
+      });
     } else {
       return res.status(401).json({ success: false, error: '账号或密码错误' });
     }
   } catch (error) {
     console.error('Login error:', error);
-    if (error.message === '账号未启用') {
-      return res.status(403).json({ success: false, error: '账号未启用' });
-    }
     return res.status(500).json({ 
       error: 'Internal server error', 
-      message: error.message,
-      larkError: error.response?.data 
+      message: error.message 
     });
   }
 }
