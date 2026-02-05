@@ -89,9 +89,139 @@
               "--tab-border": "1px",
               "--tab-radius": "0.5rem",
             },
+            red: {
+              "primary": "#ef4444",
+              "secondary": "#f87171",
+              "accent": "#b91c1c",
+              "neutral": "#1f2937",
+              "base-100": "#ffffff",
+              "base-200": "#fef2f2",
+              "base-300": "#fee2e2",
+              "info": "#3abff8",
+              "success": "#36d399",
+              "warning": "#fbbd23",
+              "error": "#f87272",
+              "--rounded-box": "1rem",
+              "--rounded-btn": "0.8rem",
+              "--rounded-badge": "1.9rem",
+              "--animation-btn": "0.25s",
+              "--animation-input": "0.2s",
+              "--btn-focus-scale": "0.95",
+              "--border-btn": "1px",
+              "--tab-border": "1px",
+              "--tab-radius": "0.5rem",
+            },
+            black: {
+              "primary": "#1f2937",
+              "secondary": "#374151",
+              "accent": "#000000",
+              "neutral": "#111827",
+              "base-100": "#ffffff",
+              "base-200": "#f3f4f6",
+              "base-300": "#e5e7eb",
+              "info": "#3abff8",
+              "success": "#36d399",
+              "warning": "#fbbd23",
+              "error": "#f87272",
+              "--rounded-box": "1rem",
+              "--rounded-btn": "0.8rem",
+              "--rounded-badge": "1.9rem",
+              "--animation-btn": "0.25s",
+              "--animation-input": "0.2s",
+              "--btn-focus-scale": "0.95",
+              "--border-btn": "1px",
+              "--tab-border": "1px",
+              "--tab-radius": "0.5rem",
+            },
+            green: {
+              "primary": "#10b981",
+              "secondary": "#34d399",
+              "accent": "#059669",
+              "neutral": "#1f2937",
+              "base-100": "#ffffff",
+              "base-200": "#ecfdf5",
+              "base-300": "#d1fae5",
+              "info": "#3abff8",
+              "success": "#36d399",
+              "warning": "#fbbd23",
+              "error": "#f87272",
+              "--rounded-box": "1rem",
+              "--rounded-btn": "0.8rem",
+              "--rounded-badge": "1.9rem",
+              "--animation-btn": "0.25s",
+              "--animation-input": "0.2s",
+              "--btn-focus-scale": "0.95",
+              "--border-btn": "1px",
+              "--tab-border": "1px",
+              "--tab-radius": "0.5rem",
+            },
+            blue: {
+              "primary": "#3b82f6",
+              "secondary": "#60a5fa",
+              "accent": "#2563eb",
+              "neutral": "#1f2937",
+              "base-100": "#ffffff",
+              "base-200": "#eff6ff",
+              "base-300": "#dbeafe",
+              "info": "#3abff8",
+              "success": "#36d399",
+              "warning": "#fbbd23",
+              "error": "#f87272",
+              "--rounded-box": "1rem",
+              "--rounded-btn": "0.8rem",
+              "--rounded-badge": "1.9rem",
+              "--animation-btn": "0.25s",
+              "--animation-input": "0.2s",
+              "--btn-focus-scale": "0.95",
+              "--border-btn": "1px",
+              "--tab-border": "1px",
+              "--tab-radius": "0.5rem",
+            },
+            orange: {
+              "primary": "#f97316",
+              "secondary": "#fb923c",
+              "accent": "#ea580c",
+              "neutral": "#1f2937",
+              "base-100": "#ffffff",
+              "base-200": "#fff7ed",
+              "base-300": "#ffedd5",
+              "info": "#3abff8",
+              "success": "#36d399",
+              "warning": "#fbbd23",
+              "error": "#f87272",
+              "--rounded-box": "1rem",
+              "--rounded-btn": "0.8rem",
+              "--rounded-badge": "1.9rem",
+              "--animation-btn": "0.25s",
+              "--animation-input": "0.2s",
+              "--btn-focus-scale": "0.95",
+              "--border-btn": "1px",
+              "--tab-border": "1px",
+              "--tab-radius": "0.5rem",
+            },
+            cyan: {
+              "primary": "#06b6d4",
+              "secondary": "#22d3ee",
+              "accent": "#0891b2",
+              "neutral": "#1f2937",
+              "base-100": "#ffffff",
+              "base-200": "#ecfeff",
+              "base-300": "#cffafe",
+              "info": "#3abff8",
+              "success": "#36d399",
+              "warning": "#fbbd23",
+              "error": "#f87272",
+              "--rounded-box": "1rem",
+              "--rounded-btn": "0.8rem",
+              "--rounded-badge": "1.9rem",
+              "--animation-btn": "0.25s",
+              "--animation-input": "0.2s",
+              "--btn-focus-scale": "0.95",
+              "--border-btn": "1px",
+              "--tab-border": "1px",
+              "--tab-radius": "0.5rem",
+            },
           },
-          "light",
-          "dark",
         ],
       },
     }
@@ -195,13 +325,27 @@
                    <div class="flex justify-between items-center mb-6">
                      <div>
                        <p class="text-sm text-base-content/60 font-medium">你好，</p>
-                       <h1 class="text-2xl font-black text-base-content">{{ authStore.userConfig?.username[0].text || 'Athlete' }}</h1>
+                       <h1 class="text-2xl font-black text-base-content">{{ authStore.userConfig?.nickname || authStore.userConfig?.username || 'Athlete' }}</h1>
                      </div>
                      <div class="dropdown dropdown-end">
                         <div tabindex="0" role="button" class="btn btn-circle btn-ghost bg-base-200 hover:bg-base-300 border-none shadow-sm">
                            <span class="text-xl font-bold text-primary">{{ userInitial }}</span>
                         </div>
                         <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100 rounded-2xl w-40 border border-base-200">
+                          <li>
+                            <details open>
+                              <summary class="font-medium">主题色</summary>
+                              <ul class="p-2 bg-base-100 rounded-t-none flex flex-wrap gap-1">
+                                <li v-for="theme in themes" :key="theme.name" class="w-full">
+                                    <a @click="setTheme(theme.value)" class="flex justify-between items-center" :class="{'active': currentTheme === theme.value}">
+                                        <span>{{ theme.name }}</span>
+                                        <span class="w-3 h-3 rounded-full" :style="{ backgroundColor: theme.color }"></span>
+                                    </a>
+                                </li>
+                              </ul>
+                            </details>
+                          </li>
+                          <div class="divider my-0"></div>
                           <li><a @click="logout" class="text-error font-medium">退出登录</a></li>
                         </ul>
                      </div>
@@ -484,6 +628,8 @@
           :description="currentAction.description"
           :kcal-per-rep="currentAction.kcal" 
           :loading="loading"
+          :action="currentAction"
+          :user-weight="authStore.userConfig?.weight"
           @close="closeModal" 
           @confirm="handleConfirm" 
         ></number-selector-modal>
@@ -521,12 +667,12 @@
              <p v-if="description" class="text-sm text-base-content/60 font-medium mb-2 px-8 leading-relaxed">{{ description }}</p>
              <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wide mt-1">
                 <span>🔥</span>
-                <span>{{ kcalPerRep }} 千卡 / 次</span>
+                <span>{{ (estimatedKcal / count).toFixed(2) }} 千卡 / 次</span>
              </div>
           </div>
           
           <!-- Main Counter -->
-          <div class="flex items-center justify-between gap-4 mb-10 px-4">
+          <div class="flex items-center justify-between gap-4 mb-6 px-4">
               <button 
                 class="btn btn-circle btn-xl bg-base-200 hover:bg-base-300 border-none text-2xl h-16 w-16 shadow-inner active:scale-95 transition-transform"
                 @click="decrement"
@@ -552,8 +698,8 @@
               </button>
           </div>
           
-          <!-- Presets -->
-          <div class="flex justify-between gap-2 mb-8 overflow-x-auto pb-2 px-1 scrollbar-hide">
+          <!-- Count Presets -->
+          <div class="flex justify-between gap-2 mb-6 overflow-x-auto pb-2 px-1 scrollbar-hide">
              <button 
                 v-for="preset in presets" 
                 :key="preset"
@@ -563,6 +709,32 @@
              >
                 {{ preset }}
              </button>
+          </div>
+
+          <!-- Weight Selector (Only for Weighted) -->
+          <div v-if="isWeighted" class="mb-8 px-4">
+              <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-bold text-base-content/40 uppercase tracking-widest">负重 (KG)</span>
+                  <span class="text-lg font-black text-base-content tabular-nums">{{ weightLifted }} <span class="text-xs">kg</span></span>
+              </div>
+              <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  v-model.number="weightLifted" 
+                  class="range range-xs range-primary w-full mb-3" 
+              />
+              <div class="flex justify-between gap-1 overflow-x-auto pb-2 scrollbar-hide">
+                 <button 
+                    v-for="wp in weightPresets" 
+                    :key="wp"
+                    @click="selectWeightPreset(wp)"
+                    class="btn btn-xs rounded-lg font-bold border-none transition-all min-w-[2.5rem]"
+                    :class="weightLifted === wp ? 'bg-secondary text-secondary-content' : 'bg-base-200 text-base-content/50 hover:bg-base-300'"
+                 >
+                    {{ wp }}
+                 </button>
+              </div>
           </div>
           
           <!-- Info & Actions -->
@@ -652,8 +824,14 @@
         localStorage.removeItem('userConfig');
         window.location.hash = '#/login'; 
       }
+      
+      // Update config (e.g., after fetching new weight)
+      function updateConfig(newConfig) {
+          userConfig.value = { ...userConfig.value, ...newConfig };
+          localStorage.setItem('userConfig', JSON.stringify(userConfig.value));
+      }
 
-      return { userConfig, login, logout };
+      return { userConfig, login, logout, updateConfig };
     });
 
     // --- Components ---
@@ -661,20 +839,65 @@
     // NumberSelectorModal
     const NumberSelectorModal = defineComponent({
       template: '#modal-template',
-      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading'], 
+      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading', 'action', 'userWeight'], 
       emits: ['close', 'confirm'],
       setup(props, { emit }) {
         const count = ref(10);
         const presets = [10, 20, 30, 40, 50];
+        
+        // Weight Lifted Logic
+        const weightLifted = ref(10); // Default 10kg
+        const weightPresets = [5, 10, 15, 20, 30, 40, 50];
+        
+        const isWeighted = computed(() => {
+             return props.action && props.action.calc_mode && props.action.calc_mode.toLowerCase() === 'weighted';
+        });
 
         watch(() => props.isOpen, (newVal) => {
           if (newVal) {
             count.value = 10;
+            // Load saved weight for this action
+            if (props.action) {
+                const savedWeight = localStorage.getItem(`weight_lifted_${props.action.id}`);
+                if (savedWeight) {
+                    weightLifted.value = parseInt(savedWeight);
+                } else {
+                    weightLifted.value = 10;
+                }
+            }
           }
         });
 
         const estimatedKcal = computed(() => {
-          return (count.value * props.kcalPerRep).toFixed(1);
+          // If action has no MET/seconds_per_rep, fallback to simple kcalPerRep
+          // But if we have calc_mode='weighted', we should try to be dynamic even if some data is missing (using defaults)
+          
+          const met = props.action?.met || 3.0; // Default moderate intensity
+          const seconds = props.action?.seconds_per_rep || 3.0;
+          const weight = props.userWeight || 70; // Default 70kg if missing
+          
+          // If we really lack specific action data, use the static kcalPerRep as base, 
+          // BUT if it's weighted, we must add the weight factor.
+          
+          let baseKcalPerRep;
+          
+          if (props.action && props.action.met && props.action.seconds_per_rep) {
+               // Formula 1: Standard MET calculation
+               baseKcalPerRep = met * weight * (seconds / 3600);
+          } else {
+               // Fallback to static value from DB
+               baseKcalPerRep = props.kcalPerRep || 0.5;
+          }
+          
+          let finalKcalPerRep = baseKcalPerRep;
+          
+          // Formula 2: Weighted
+          // Apply weight factor if mode is weighted
+          if (props.action && props.action.calc_mode && props.action.calc_mode.toLowerCase() === 'weighted') {
+               finalKcalPerRep = finalKcalPerRep * (1 + (weightLifted.value / weight));
+          }
+          
+          return (count.value * finalKcalPerRep).toFixed(1);
         });
 
         const increment = () => {
@@ -697,10 +920,25 @@
           if (navigator.vibrate) navigator.vibrate(50);
           count.value = val;
         };
+        
+        const selectWeightPreset = (val) => {
+            if (navigator.vibrate) navigator.vibrate(50);
+            weightLifted.value = val;
+            // Save immediately? Or on confirm? User said "update local after setting"
+            // Let's save on confirm to be sure, but maybe here too for UX?
+            // "Updated to local after user sets it" - implies immediately or on save.
+            // I'll stick to saving on confirm to avoid trash data if they cancel.
+        };
 
         const confirm = () => {
           if (navigator.vibrate) navigator.vibrate(50);
-          emit('confirm', count.value, estimatedKcal.value);
+          
+          // Save weight preference
+          if (isWeighted.value && props.action) {
+               localStorage.setItem(`weight_lifted_${props.action.id}`, weightLifted.value);
+          }
+          
+          emit('confirm', count.value, estimatedKcal.value, isWeighted.value ? weightLifted.value : 0);
         };
 
         const close = () => {
@@ -711,7 +949,8 @@
         
         const loading = computed(() => props.loading);
 
-        return { count, presets, estimatedKcal, increment, decrement, updateCount, selectPreset, confirm, close, loading };
+        return { count, presets, estimatedKcal, increment, decrement, updateCount, selectPreset, confirm, close, loading, 
+                 isWeighted, weightLifted, weightPresets, selectWeightPreset };
       }
     });
 
@@ -850,6 +1089,7 @@
       template: '#dashboard-template',
       components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal },
       setup() {
+        const router = useRouter();
         const authStore = useAuthStore();
         const history = ref([]);
         const allHistory = ref([]);
@@ -873,6 +1113,24 @@
         const isAnimating = ref(false); // New
         const isResetting = ref(false); // New
         
+        // Theme Logic
+        const currentTheme = ref(localStorage.getItem('theme') || 'fittrack');
+        const themes = [
+            { name: '默认紫', value: 'light', color: '#6366f1' },
+            { name: '活力红', value: 'valentine', color: '#ef4444' },
+            { name: '极夜黑', value: 'black', color: '#1f2937' },
+            { name: '自然绿', value: 'emerald', color: '#10b981' },
+            { name: '天空蓝', value: 'corporate', color: '#3b82f6' },
+            { name: '暖阳橙', value: 'halloween', color: '#f97316' },
+            { name: '青色', value: 'aqua', color: '#06b6d4' }
+        ];
+
+        const setTheme = (theme) => {
+            currentTheme.value = theme;
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        };
+        
         // Touch handling for general swipe (removed for tabs, but kept logic vars if needed)
         // const touchStartX = ref(0);
         // const touchEndX = ref(0);
@@ -887,8 +1145,12 @@
         const isPreferenceModalOpen = ref(false);
         const preferenceSaving = ref(false);
 
-        // Load preferred actions
-        onMounted(() => {
+        // Load preferred actions and Init
+        onMounted(async () => {
+            // 1. Initialize Theme
+            document.documentElement.setAttribute('data-theme', currentTheme.value);
+
+            // 2. Load Preferred Actions
             // Priority: LocalStorage -> UserConfig (fallback)
             let loaded = false;
             const local = localStorage.getItem('preferredActions');
@@ -905,6 +1167,30 @@
                     preferredActions.value = config.preferredAction;
                 }
             }
+
+            // 3. Check and Fetch User Info (Weight)
+            if (authStore.userConfig) {
+                console.log('Checking weight for user:', authStore.userConfig.userId, 'Current weight:', authStore.userConfig.weight);
+                if (!authStore.userConfig.weight) {
+                    console.log('Weight missing, fetching from API...');
+                    try {
+                        const res = await axios.post('/api/get-user-info', { userId: authStore.userConfig.userId });
+                        console.log('User info API response:', res.data);
+                        if (res.data.success) {
+                            authStore.updateConfig(res.data.userConfig);
+                            console.log('Weight updated locally:', res.data.userConfig.weight);
+                        }
+                    } catch (e) {
+                        console.error('Failed to update user info:', e);
+                    }
+                }
+            } else {
+                console.log('No userConfig found in authStore');
+            }
+
+            // 4. Fetch Data
+            await fetchActions();
+            await fetchHistory('today');
         });
 
         const getCategoryMatch = (action, category) => {
@@ -1014,9 +1300,13 @@
                             label: label, // Chinese Label (for display)
                             description: desc,
                             target_muscle_group: muscle,
-                            kcal: 0.3, // Default
+                            kcal: 0.3, // Default fallback
                             icon: icon,
-                            color: color
+                            color: color,
+                            // New fields for calorie calculation
+                            met: item.met,
+                            seconds_per_rep: item.seconds_per_rep,
+                            calc_mode: item.calc_mode
                         };
                     });
                     
@@ -1048,10 +1338,7 @@
             return groups;
         });
 
-        onMounted(async () => {
-          await fetchActions();
-          await fetchHistory('today');
-        });
+        // Cleaned up duplicate onMounted
 
         const fetchHistory = async (range = 'today') => {
             const config = authStore.userConfig?.configuration;
@@ -1083,7 +1370,7 @@
                         
                         const action = allActions.value.find(a => a.name === actionId || a.label === actionId || a.id === actionId);
                         
-                        let kcal = fields.Kcal_Burned;
+                        let kcal = fields.calories || fields.Kcal_Burned;
                         if (!kcal && action) {
                             kcal = (fields.count * action.kcal).toFixed(1);
                         }
@@ -1343,7 +1630,7 @@
           isModalOpen.value = false;
         };
 
-        const handleConfirm = async (count) => {
+        const handleConfirm = async (count, estimatedKcal, weightLifted) => {
           if (!currentAction.value.id) return;
           
           loading.value = true;
@@ -1361,7 +1648,9 @@
                   appToken: config.fs_app_token,
                   tableId: config.fs_table_id,
                   trainingType: currentAction.value.name,
-                  count: count
+                  count: count,
+                  weightLifted: parseInt(weightLifted),
+                  calories: Math.round(parseFloat(estimatedKcal))
                 });
                 
                 // Update local data directly instead of fetching from server
@@ -1373,8 +1662,8 @@
                     const actionName = currentAction.value.name;
                     const actionDef = allActions.value.find(a => a.name === actionName);
                     
-                    // Calculate kcal
-                    const kcal = actionDef ? (newRecord.count * actionDef.kcal).toFixed(1) : 0;
+                    // Use returned calories or fallback to passed estimatedKcal
+                    const kcal = newRecord.calories || estimatedKcal || 0;
                     
                     const localRecord = {
                         id: newRecord.id,
@@ -1444,6 +1733,7 @@
 
         const logout = () => {
           authStore.logout();
+          router.push('/login');
         };
 
         const userInitial = computed(() => {
@@ -1514,6 +1804,18 @@
           initialModalSelected,
           preferenceSaving,
           savePreferences,
+          // Theme
+          themes: [
+            { name: '默认紫', value: 'light', color: '#6366f1' },
+            { name: '活力红', value: 'valentine', color: '#ef4444' },
+            { name: '极夜黑', value: 'black', color: '#1f2937' },
+            { name: '自然绿', value: 'emerald', color: '#10b981' },
+            { name: '天空蓝', value: 'corporate', color: '#3b82f6' },
+            { name: '暖阳橙', value: 'halloween', color: '#f97316' },
+            { name: '青色', value: 'aqua', color: '#06b6d4' }
+          ],
+          currentTheme,
+          setTheme,
           // Pump
           pumpData,
           currentCard,

@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, trainingType, count } = req.body;
+  const { userId, trainingType, count, weightLifted, calories } = req.body;
 
   if (!userId || !trainingType || !count) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -25,10 +25,12 @@ export default async function handler(req, res) {
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
+    const weight = weightLifted || 0; // Default to 0 if not provided
+    const cal = calories || 0;
 
     const result = await sql`
-      INSERT INTO training_records (id, user_id, training_types, count, created_at, record_time)
-      VALUES (${recordId}, ${userId}, ${trainingType}, ${count}, ${timestamp}, ${timestamp})
+      INSERT INTO training_records (id, user_id, training_types, count, created_at, record_time, weight_lifted, calories)
+      VALUES (${recordId}, ${userId}, ${trainingType}, ${count}, ${timestamp}, ${timestamp}, ${weight}, ${cal})
       RETURNING *
     `;
     return res.status(200).json({ success: true, data: result.rows[0] });

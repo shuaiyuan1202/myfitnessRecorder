@@ -28,7 +28,9 @@ export default async function handler(req, res) {
             fields: {
                 training_types: row.training_types || row.action,
                 count: row.count,
-                record_time: createdMs
+                record_time: createdMs,
+                calories: row.calories,
+                weight_lifted: row.weight_lifted
             }
         };
     });
