@@ -672,8 +672,6 @@
                 class="relative flex items-center justify-center w-16 h-16 bg-primary text-primary-content rounded-full shadow-lg cursor-pointer transition-transform active:scale-95 select-none touch-none"
                 @pointerdown.prevent="startListening"
                 @pointerup.prevent="stopListening"
-                @pointerleave.prevent="stopListening"
-                @pointercancel.prevent="stopListening"
                 @contextmenu.prevent
             >
                 <!-- Ripple Effect -->
@@ -1588,15 +1586,16 @@
             
             recognition.onerror = (event) => {
                 console.error('Speech recognition error', event.error);
-                if (event.error === 'not-allowed') {
-                     alert('无法访问麦克风。请检查系统设置 > 隐私 > 麦克风权限。');
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                     alert('无法访问麦克风或语音服务。\n\n1. 请确保使用 HTTPS 协议或 localhost。\n2. 请检查系统设置 > 隐私 > 麦克风权限。');
                      isListening.value = false;
                 } else if (event.error === 'no-speech') {
                     // Ignore no-speech, keep listening
                     console.log('No speech detected');
                 } else if (event.error === 'aborted') {
-                    // Ignore aborted (user stopped)
-                    isListening.value = false;
+                    // Ignore aborted (user stopped or system interruption)
+                    // Do NOT set isListening to false here immediately, as it might be a temporary system hiccup
+                    console.log('Recognition aborted');
                 } else {
                     alert('语音识别错误: ' + event.error);
                     isListening.value = false; 
