@@ -670,13 +670,10 @@
         <div v-if="activeTab === 'today'" class="fixed bottom-24 right-6 z-40">
             <div 
                 class="relative flex items-center justify-center w-16 h-16 bg-primary text-primary-content rounded-full shadow-lg cursor-pointer transition-transform active:scale-95 select-none touch-none"
-                @touchstart.prevent="startListening"
-                @touchend.prevent="stopListening"
-                @touchcancel.prevent="stopListening"
-                @touchmove.prevent
-                @mousedown.prevent="startListening"
-                @mouseup.prevent="stopListening"
-                @mouseleave="stopListening"
+                @pointerdown.prevent="startListening"
+                @pointerup.prevent="stopListening"
+                @pointerleave.prevent="stopListening"
+                @pointercancel.prevent="stopListening"
                 @contextmenu.prevent
             >
                 <!-- Ripple Effect -->
@@ -1545,8 +1542,19 @@
                 return;
             }
             
-            // Vibration feedback
-            if (navigator.vibrate) navigator.vibrate(50);
+            // Check for Secure Context (Required for Mic)
+            if (!window.isSecureContext) {
+                 alert('语音识别需要HTTPS或Localhost环境。当前环境不安全，无法访问麦克风。');
+                 return;
+            }
+
+            // Prevent multiple instances
+            if (isListening.value) return;
+
+            // Vibration feedback (Android only usually)
+            try {
+                if (navigator.vibrate) navigator.vibrate(50);
+            } catch(e) {}
             
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
@@ -1561,9 +1569,13 @@
             };
             
             recognition.onend = () => {
-                isListening.value = false;
-                // Ensure final processing happens if not already (debouncer might have one pending)
-                // But usually we process on result.
+                // Only set to false if we didn't intend to stop?
+                // Actually, let's keep it simple. If it ends, it ends.
+                // But if it ends unexpectedly (without user release), we might want to know why.
+                if (isListening.value) {
+                    console.log('Recognition ended unexpectedly');
+                    isListening.value = false;
+                }
             };
             
             recognition.onresult = (event) => {
@@ -1577,20 +1589,26 @@
             recognition.onerror = (event) => {
                 console.error('Speech recognition error', event.error);
                 if (event.error === 'not-allowed') {
-                     alert('无法访问麦克风，请在系统设置中允许浏览器访问麦克风。');
+                     alert('无法访问麦克风。请检查系统设置 > 隐私 > 麦克风权限。');
                      isListening.value = false;
                 } else if (event.error === 'no-speech') {
-                    // Ignore no-speech, keep listening if possible, or let it end naturally
-                    // But for UX, we might want to stay in listening state until user releases
+                    // Ignore no-speech, keep listening
                     console.log('No speech detected');
+                } else if (event.error === 'aborted') {
+                    // Ignore aborted (user stopped)
+                    isListening.value = false;
                 } else {
-                    voiceTranscript.value = 'Error: ' + event.error;
-                    // Don't auto close for other errors to allow user to see what happened
-                    // isListening.value = false; 
+                    alert('语音识别错误: ' + event.error);
+                    isListening.value = false; 
                 }
             };
             
-            recognition.start();
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error('Failed to start recognition:', e);
+                // alert('无法启动语音识别: ' + e.message);
+            }
             
             // Auto stop after 20s
             setTimeout(() => {
