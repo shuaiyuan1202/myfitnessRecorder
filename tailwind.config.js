@@ -37,6 +37,12 @@ export default {
       },
       "light",
       "dark",
+      "valentine",
+      "black",
+      "emerald",
+      "corporate",
+      "halloween",
+      "aqua"
     ],
   },
 }

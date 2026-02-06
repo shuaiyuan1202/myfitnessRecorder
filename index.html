@@ -8,7 +8,7 @@
   <!-- PWA Config -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#6366f1">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FitTrack">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -17,7 +17,14 @@
   <!-- Tailwind & DaisyUI -->
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- TEMPLATE: Preference Selector Modal -->
+  
+  <!-- Vue 3 (Production) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/vue-demi"></script>
+  <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+  <!-- Pinia -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pinia/2.1.7/pinia.iife.min.js"></script>
   <script type="text/x-template" id="preference-selector-template">
     <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="close"></div>
@@ -53,6 +60,44 @@
                 >
                     <span v-if="loading" class="loading loading-spinner"></span>
                     <span v-else>保存设置</span>
+                </button>
+            </div>
+        </div>
+    </div>
+  </script>
+
+  <!-- TEMPLATE: Height/Weight Modal -->
+  <script type="text/x-template" id="hw-modal-template">
+    <div v-if="isOpen" class="fixed inset-0 z-[80] flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative w-full max-w-sm mx-6 bg-base-100 rounded-3xl p-6 shadow-2xl animate-slide-up">
+            <h3 class="text-xl font-black text-base-content mb-2 text-center">完善个人信息</h3>
+            <p class="text-sm text-base-content/60 text-center mb-6">为了更精准地计算热量消耗，请补充您的身体数据。</p>
+            
+            <div class="space-y-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-bold">身高 (cm)</span>
+                    </label>
+                    <input type="number" v-model="height" placeholder="例如: 175" class="input input-bordered w-full rounded-xl bg-base-200 focus:bg-base-100 transition-all" />
+                </div>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text font-bold">体重 (kg)</span>
+                    </label>
+                    <input type="number" v-model="weight" placeholder="例如: 70" class="input input-bordered w-full rounded-xl bg-base-200 focus:bg-base-100 transition-all" />
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <button 
+                    class="btn btn-primary w-full rounded-xl font-bold shadow-lg shadow-primary/30" 
+                    @click="save" 
+                    :disabled="loading || !isValid"
+                >
+                    <span v-if="loading" class="loading loading-spinner"></span>
+                    <span v-else>保存信息</span>
                 </button>
             </div>
         </div>
@@ -227,12 +272,7 @@
     }
   </script>
 
-  <!-- Libraries -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://unpkg.com/vue-demi"></script>
-  <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
-  <script src="https://unpkg.com/pinia@2/dist/pinia.iife.js"></script>
-  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <!-- Libraries removed (duplicates) -->
 
   <style>
     /* Global Styles & Animations */
@@ -440,7 +480,7 @@
                       <!-- List -->
                       <div 
                          v-else
-                         v-for="(record, index) in history.slice(0, 10)" 
+                         v-for="(record, index) in history" 
                          :key="record.id"
                          class="relative pl-6 group"
                       >
@@ -448,31 +488,46 @@
                          <div class="absolute -left-[7px] top-6 w-4 h-4 rounded-full border-2 border-base-100" :class="index === 0 ? 'bg-primary ring-4 ring-primary/20' : 'bg-base-300'"></div>
                          
                          <!-- Content -->
-                         <div class="bg-base-100 p-4 rounded-2xl shadow-sm border border-base-100 flex justify-between items-center transition-transform">
-                            <div class="flex items-center gap-3">
-                               <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center text-xl">
-                                  {{ getIcon(record.actionType) }}
-                               </div>
-                               <div>
-                                  <div class="font-bold text-base-content">{{ record.actionType }}</div>
-                                  <div class="text-xs text-base-content/50 font-medium">{{ formatTime(record.date) }}</div>
-                               </div>
-                            </div>
-                            
-                            <div class="text-right pr-6">
-                               <div class="font-black text-lg text-base-content">{{ record.count }} <span class="text-xs font-medium text-base-content/40">次</span></div>
-                               <div class="text-xs font-bold text-primary">{{ record.kcal }} kcal</div>
-                            </div>
-            
-                            <!-- Delete Button -->
-                            <button 
-                               @click.stop="deleteRecord(record.id)"
-                               class="btn btn-ghost btn-xs text-error absolute -right-0 top-1/2 -translate-y-1/2 group-hover:opacity-100 transition-opacity"
-                               :class="{'opacity-100': deletingId === record.id}"
-                            >
-                               <span v-if="deletingId === record.id" class="loading loading-spinner loading-xs"></span>
-                               <span v-else>🗑️</span>
-                            </button>
+                         <!-- Wrapper for Swipe -->
+                         <div class="relative overflow-hidden rounded-2xl">
+                             <!-- Delete Action Background -->
+                             <div 
+                                 class="absolute inset-y-0 right-0 w-20 bg-error/10 text-error flex flex-col items-center justify-center cursor-pointer active:bg-error/20 transition-colors"
+                                 @click.stop="deleteRecord(record.id)"
+                             >
+                                 <span v-if="deletingId === record.id" class="loading loading-spinner loading-xs"></span>
+                                 <template v-else>
+                                     <span class="text-lg">🗑️</span>
+                                 </template>
+                             </div>
+
+                             <!-- Swipeable Content Card -->
+                             <div 
+                                 class="bg-base-100 p-4 shadow-sm border border-base-100 flex justify-between items-center relative z-10 select-none touch-pan-y"
+                                 :style="getSwipeStyle(record.id)"
+                                 @touchstart.passive="onSwipeStart($event, record.id)"
+                                 @touchmove="onSwipeMove"
+                                 @touchend="onSwipeEnd"
+                                 @mousedown="onSwipeStart($event, record.id)"
+                                 @mousemove="onSwipeMove"
+                                 @mouseup="onSwipeEnd"
+                                 @mouseleave="onSwipeEnd"
+                             >
+                                <div class="flex items-center gap-3 pointer-events-none">
+                                   <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center text-xl">
+                                      {{ getIcon(record.actionType) }}
+                                   </div>
+                                   <div>
+                                      <div class="font-bold text-base-content">{{ record.actionType }}</div>
+                                      <div class="text-xs text-base-content/50 font-medium">{{ formatTime(record.date) }}</div>
+                                   </div>
+                                </div>
+                                
+                                <div class="text-right pointer-events-none">
+                                   <div class="font-black text-lg text-base-content">{{ record.count }} <span class="text-xs font-medium text-base-content/40">次</span></div>
+                                   <div class="text-xs font-bold text-primary">{{ record.kcal }} kcal</div>
+                                </div>
+                             </div>
                          </div>
                       </div>
                    </div>
@@ -646,8 +701,17 @@
 
         <rest-timer-modal 
           :is-open="isRestTimerOpen" 
+          :loading="repeatLoading"
+          :show-success="repeatSuccess"
           @close="isRestTimerOpen = false"
+          @repeat="handleRepeat"
         ></rest-timer-modal>
+
+        <height-weight-modal
+            :is-open="isHWModalOpen"
+            :loading="hwLoading"
+            @save="saveUserInfo"
+        ></height-weight-modal>
     </div>
   </script>
 
@@ -767,27 +831,52 @@
             <!-- Decorative Background -->
             <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-secondary"></div>
             
-            <h3 class="text-2xl font-black text-base-content mb-2">休息一下</h3>
-            <p class="text-base-content/60 font-medium mb-8">准备下一组训练</p>
-            
-            <!-- Timer Circle -->
-            <div class="relative w-48 h-48 mx-auto mb-8 flex items-center justify-center">
-                <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-base-200" stroke-width="8" />
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-primary transition-all duration-1000 ease-linear" stroke-width="8" :stroke-dasharray="283" :stroke-dashoffset="283 - (283 * timeLeft / totalTime)" stroke-linecap="round" />
-                </svg>
-                <div class="absolute inset-0 flex items-center justify-center flex-col">
-                    <span class="text-6xl font-black tabular-nums tracking-tighter">{{ timeLeft }}</span>
-                    <span class="text-xs font-bold text-base-content/40 uppercase tracking-widest mt-1">秒</span>
-                </div>
+            <!-- Loading State -->
+            <div v-if="loading" class="py-12 flex flex-col items-center justify-center animate-fade-in">
+                 <span class="loading loading-spinner loading-lg text-primary mb-4"></span>
+                 <p class="text-lg font-bold text-base-content/80">正在提交...</p>
             </div>
-            
-            <button 
-                class="btn btn-ghost btn-lg w-full rounded-2xl font-bold text-base-content/60 hover:text-base-content hover:bg-base-200" 
-                @click="stop"
-            >
-                开始下一组
-            </button>
+
+            <!-- Success State -->
+            <div v-else-if="showSuccess" class="py-12 flex flex-col items-center justify-center animate-fade-in">
+                 <div class="w-20 h-20 bg-success/20 rounded-full flex items-center justify-center mb-4 text-4xl text-success animate-bounce">
+                    ✓
+                 </div>
+                 <p class="text-xl font-black text-base-content">已记录!</p>
+                 <p class="text-sm text-base-content/60">准备下一组</p>
+            </div>
+
+            <!-- Timer State -->
+            <div v-else class="animate-fade-in">
+                <h3 class="text-2xl font-black text-base-content mb-2">休息一下</h3>
+                <p class="text-base-content/60 font-medium mb-8">准备下一组训练</p>
+                
+                <!-- Timer Circle -->
+                <div class="relative w-48 h-48 mx-auto mb-8 flex items-center justify-center">
+                    <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-base-200" stroke-width="8" />
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-primary transition-all duration-1000 ease-linear" stroke-width="8" :stroke-dasharray="283" :stroke-dashoffset="283 - (283 * timeLeft / totalTime)" stroke-linecap="round" />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center flex-col">
+                        <span class="text-6xl font-black tabular-nums tracking-tighter">{{ timeLeft }}</span>
+                        <span class="text-xs font-bold text-base-content/40 uppercase tracking-widest mt-1">秒</span>
+                    </div>
+                </div>
+                
+                <button 
+                    class="btn btn-primary btn-lg w-full rounded-2xl font-bold shadow-xl shadow-primary/30 mb-4" 
+                    @click="$emit('repeat')"
+                >
+                    再来一组
+                </button>
+
+                <button 
+                    class="btn btn-ghost btn-lg w-full rounded-2xl font-bold text-base-content/60 hover:text-base-content hover:bg-base-200" 
+                    @click="stop"
+                >
+                    开始下一组
+                </button>
+            </div>
         </div>
     </div>
   </script>
@@ -812,7 +901,14 @@
 
     // --- Store ---
     const useAuthStore = defineStore('auth', () => {
-      const userConfig = ref(JSON.parse(localStorage.getItem('userConfig')) || null);
+      let storedConfig = null;
+      try {
+        storedConfig = JSON.parse(localStorage.getItem('userConfig'));
+      } catch (e) {
+        console.warn('Invalid userConfig in localStorage, resetting.');
+        localStorage.removeItem('userConfig');
+      }
+      const userConfig = ref(storedConfig);
       
       function login(config) {
         userConfig.value = config;
@@ -822,6 +918,7 @@
       function logout() {
         userConfig.value = null;
         localStorage.removeItem('userConfig');
+        localStorage.removeItem('cachedActions');
         window.location.hash = '#/login'; 
       }
       
@@ -957,8 +1054,8 @@
     // Rest Timer Modal
     const RestTimerModal = defineComponent({
       template: '#rest-timer-template',
-      props: ['isOpen'],
-      emits: ['close'],
+      props: ['isOpen', 'loading', 'showSuccess'],
+      emits: ['close', 'repeat'],
       setup(props, { emit }) {
         const totalTime = 60;
         const timeLeft = ref(totalTime);
@@ -991,6 +1088,13 @@
             }
         });
 
+        // Restart timer after success message is hidden
+        watch(() => props.showSuccess, (newVal, oldVal) => {
+            if (oldVal && !newVal && props.isOpen) {
+                startTimer();
+            }
+        });
+
         const stop = () => {
             stopTimer();
             emit('close');
@@ -998,9 +1102,12 @@
 
         onUnmounted(() => {
             stopTimer();
-            });
+        });
 
-        return { timeLeft, totalTime, stop };
+        const loading = computed(() => props.loading);
+        const showSuccess = computed(() => props.showSuccess);
+
+        return { timeLeft, totalTime, stop, loading, showSuccess };
       }
     });
 
@@ -1041,6 +1148,29 @@
         };
 
         return { toggle, isSelected, save, close };
+      }
+    });
+
+    // HeightWeightModal
+    const HeightWeightModal = defineComponent({
+      template: '#hw-modal-template',
+      props: ['isOpen', 'loading'],
+      emits: ['save'],
+      setup(props, { emit }) {
+        const height = ref('');
+        const weight = ref('');
+        
+        const isValid = computed(() => {
+            return height.value > 50 && height.value < 300 && weight.value > 20 && weight.value < 300;
+        });
+
+        const save = () => {
+            if (isValid.value) {
+                emit('save', { height: height.value, weight: weight.value });
+            }
+        };
+
+        return { height, weight, isValid, save };
       }
     });
 
@@ -1087,7 +1217,7 @@
     // Dashboard
     const Dashboard = defineComponent({
       template: '#dashboard-template',
-      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal },
+      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal, HeightWeightModal },
       setup() {
         const router = useRouter();
         const authStore = useAuthStore();
@@ -1116,13 +1246,13 @@
         // Theme Logic
         const currentTheme = ref(localStorage.getItem('theme') || 'fittrack');
         const themes = [
-            { name: '默认紫', value: 'light', color: '#6366f1' },
-            { name: '活力红', value: 'valentine', color: '#ef4444' },
+            { name: '默认紫', value: 'fittrack', color: '#6366f1' },
+            { name: '活力红', value: 'red', color: '#ef4444' },
             { name: '极夜黑', value: 'black', color: '#1f2937' },
-            { name: '自然绿', value: 'emerald', color: '#10b981' },
-            { name: '天空蓝', value: 'corporate', color: '#3b82f6' },
-            { name: '暖阳橙', value: 'halloween', color: '#f97316' },
-            { name: '青色', value: 'aqua', color: '#06b6d4' }
+            { name: '自然绿', value: 'green', color: '#10b981' },
+            { name: '天空蓝', value: 'blue', color: '#3b82f6' },
+            { name: '暖阳橙', value: 'orange', color: '#f97316' },
+            { name: '青色', value: 'cyan', color: '#06b6d4' }
         ];
 
         const setTheme = (theme) => {
@@ -1144,6 +1274,95 @@
         const preferredActions = ref([]); // List of action IDs
         const isPreferenceModalOpen = ref(false);
         const preferenceSaving = ref(false);
+
+        // Height/Weight Modal Logic
+        const isHWModalOpen = ref(false);
+        const hwLoading = ref(false);
+
+        const saveUserInfo = async (data) => {
+            hwLoading.value = true;
+            try {
+                const userId = authStore.userConfig?.userId;
+                if (!userId) return;
+
+                // Save to cloud
+                await axios.post('/api/update-user-info', {
+                    userId,
+                    height: data.height,
+                    weight: data.weight
+                });
+
+                // Update local
+                authStore.updateConfig({
+                    height: data.height,
+                    weight: data.weight
+                });
+                
+                isHWModalOpen.value = false;
+            } catch (e) {
+                console.error('Failed to save user info:', e);
+                alert('保存失败，请重试');
+            } finally {
+                hwLoading.value = false;
+            }
+        };
+
+        // --- Swipe to Delete Logic ---
+        const swipeActiveId = ref(null);
+        const swipeOffset = ref(0);
+        const isSwipeDragging = ref(false);
+        const swipeStartX = ref(0);
+
+        const onSwipeStart = (e, id) => {
+            if (swipeActiveId.value && swipeActiveId.value !== id) {
+                swipeActiveId.value = null;
+                swipeOffset.value = 0;
+            }
+
+            if (swipeActiveId.value === id) {
+                swipeStartX.value = e.touches[0].clientX - swipeOffset.value;
+            } else {
+                swipeActiveId.value = id;
+                swipeStartX.value = e.touches[0].clientX;
+                swipeOffset.value = 0;
+            }
+            isSwipeDragging.value = true;
+        };
+
+        const onSwipeMove = (e) => {
+            if (!isSwipeDragging.value || !swipeActiveId.value) return;
+            
+            const currentX = e.touches[0].clientX;
+            const diff = currentX - swipeStartX.value;
+            
+            if (diff < -80) swipeOffset.value = -80;
+            else if (diff > 0) swipeOffset.value = 0;
+            else swipeOffset.value = diff;
+        };
+
+        const onSwipeEnd = () => {
+            isSwipeDragging.value = false;
+            if (!swipeActiveId.value) return;
+
+            if (swipeOffset.value < -40) {
+                swipeOffset.value = -80; 
+            } else {
+                swipeOffset.value = 0;   
+                swipeActiveId.value = null;
+            }
+        };
+
+        const getSwipeStyle = (id) => {
+            if (swipeActiveId.value === id) {
+                return {
+                    transform: `translateX(${swipeOffset.value}px)`,
+                    transition: isSwipeDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1)'
+                };
+            }
+            return {
+                transition: 'transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1)'
+            };
+        };
 
         // Load preferred actions and Init
         onMounted(async () => {
@@ -1168,24 +1387,30 @@
                 }
             }
 
-            // 3. Check and Fetch User Info (Weight)
-            if (authStore.userConfig) {
-                console.log('Checking weight for user:', authStore.userConfig.userId, 'Current weight:', authStore.userConfig.weight);
-                if (!authStore.userConfig.weight) {
-                    console.log('Weight missing, fetching from API...');
+            // 3. Check and Fetch User Info (Height & Weight)
+            const config = authStore.userConfig;
+            if (config) {
+                if (!config.weight || !config.height) {
                     try {
-                        const res = await axios.post('/api/get-user-info', { userId: authStore.userConfig.userId });
-                        console.log('User info API response:', res.data);
+                        const res = await axios.post('/api/get-user-info', { userId: config.userId });
                         if (res.data.success) {
-                            authStore.updateConfig(res.data.userConfig);
-                            console.log('Weight updated locally:', res.data.userConfig.weight);
+                            const cloudConfig = res.data.userConfig;
+                            // Check if cloud has info
+                            if (cloudConfig.weight && cloudConfig.height) {
+                                authStore.updateConfig(cloudConfig);
+                            } else {
+                                // Cloud also missing -> Prompt
+                                isHWModalOpen.value = true;
+                            }
                         }
                     } catch (e) {
                         console.error('Failed to update user info:', e);
+                        // Optional: if network error, maybe prompt anyway? 
+                        // Assuming if check fails we might want to prompt if we really need it,
+                        // but let's stick to "if cloud also no data". If network fail, we don't know if cloud has data.
+                        // For safety, maybe just do nothing on network error, try again next load.
                     }
                 }
-            } else {
-                console.log('No userConfig found in authStore');
             }
 
             // 4. Fetch Data
@@ -1630,76 +1855,104 @@
           isModalOpen.value = false;
         };
 
-        const handleConfirm = async (count, estimatedKcal, weightLifted) => {
-          if (!currentAction.value.id) return;
-          
-          loading.value = true;
+        const lastRecordParams = ref(null);
+        const repeatLoading = ref(false);
+        const repeatSuccess = ref(false);
 
-          try {
-            // Optimistic update removed per user request - waiting for backend
-            
-            // Sync with Server
-            const config = authStore.userConfig?.configuration;
-            const userId = authStore.userConfig?.userId;
+        // Core submission logic (reused)
+        const submitRecord = async (action, count, estimatedKcal, weightLifted) => {
+             const config = authStore.userConfig?.configuration;
+             const userId = authStore.userConfig?.userId;
 
-            if (config && userId) {
-                 const response = await axios.post('/api/submit-record', {
+             if (!config || !userId) {
+                 throw new Error("Missing config");
+             }
+
+             const response = await axios.post('/api/submit-record', {
                   userId: userId,
                   appToken: config.fs_app_token,
                   tableId: config.fs_table_id,
-                  trainingType: currentAction.value.name,
+                  trainingType: action.name,
                   count: count,
                   weightLifted: parseInt(weightLifted),
                   calories: Math.round(parseFloat(estimatedKcal))
-                });
-                
-                // Update local data directly instead of fetching from server
-                if (response.data.success) {
-                    const newRecord = response.data.data;
-                    const createdMs = newRecord.created_at * 1000; // Convert seconds to ms
-                    
-                    // Find action info for display
-                    const actionName = currentAction.value.name;
-                    const actionDef = allActions.value.find(a => a.name === actionName);
-                    
-                    // Use returned calories or fallback to passed estimatedKcal
-                    const kcal = newRecord.calories || estimatedKcal || 0;
-                    
-                    const localRecord = {
-                        id: newRecord.id,
-                        date: createdMs,
-                        actionType: actionDef ? actionDef.label : actionName,
-                        count: newRecord.count,
-                        kcal: kcal
-                    };
-                    
-                    // Add to today's history (assuming DESC order)
-                    history.value.unshift(localRecord);
-                    
-                    // Add to all history if it has been loaded
-                    if (allHistory.value.length > 0) {
-                        allHistory.value.unshift(localRecord);
-                    }
-                }
-                
-                // Play finish sound
-                const audio = new Audio('resources/finish.mp3');
-                audio.play().catch(e => console.log('Audio play failed:', e));
+             });
 
-                closeModal();
-                isRestTimerOpen.value = true;
-            } else {
-                console.warn("Missing config or userId, skipping API sync");
-                alert("Cannot sync: Missing configuration.");
-                closeModal();
-            }
-            
+             if (response.data.success) {
+                 const newRecord = response.data.data;
+                 const createdMs = newRecord.created_at * 1000;
+                 const actionName = action.name;
+                 const actionDef = allActions.value.find(a => a.name === actionName);
+                 const kcal = newRecord.calories || estimatedKcal || 0;
+                 
+                 const localRecord = {
+                     id: newRecord.id,
+                     date: createdMs,
+                     actionType: actionDef ? actionDef.label : actionName,
+                     count: newRecord.count,
+                     kcal: kcal
+                 };
+                 
+                 history.value.unshift(localRecord);
+                 if (allHistory.value.length > 0) {
+                     allHistory.value.unshift(localRecord);
+                 }
+                 
+                 // Play finish sound
+                 const audio = new Audio('resources/finish.mp3');
+                 audio.play().catch(e => console.log('Audio play failed:', e));
+             }
+        };
+
+        const handleConfirm = async (count, estimatedKcal, weightLifted) => {
+          if (!currentAction.value.id) return;
+          
+          lastRecordParams.value = {
+              action: { ...currentAction.value },
+              count,
+              estimatedKcal,
+              weightLifted
+          };
+
+          loading.value = true;
+
+          try {
+            await submitRecord(currentAction.value, count, estimatedKcal, weightLifted);
+            closeModal();
+            isRestTimerOpen.value = true;
           } catch (error) {
             console.error('Failed to submit record:', error);
-            alert('Failed to sync with server.');
+            if (error.message === "Missing config") {
+                 alert("Cannot sync: Missing configuration.");
+            } else {
+                 alert('Failed to sync with server.');
+            }
           } finally {
             loading.value = false;
           }
+        };
+
+        const handleRepeat = async () => {
+            if (!lastRecordParams.value) return;
+            
+            repeatLoading.value = true;
+            repeatSuccess.value = false;
+            
+            const { action, count, estimatedKcal, weightLifted } = lastRecordParams.value;
+            
+            try {
+                await submitRecord(action, count, estimatedKcal, weightLifted);
+                
+                repeatSuccess.value = true;
+                setTimeout(() => {
+                    repeatSuccess.value = false;
+                }, 1500);
+            } catch (error) {
+                console.error('Repeat failed:', error);
+                alert('重试失败，请检查网络');
+            } finally {
+                repeatLoading.value = false;
+            }
         };
 
         const deleteRecord = async (id) => {
@@ -1731,8 +1984,12 @@
           }
         };
 
+        // Duplicate handleRepeat removed
+
         const logout = () => {
           authStore.logout();
+          localStorage.removeItem('cachedActions');
+          localStorage.removeItem('userConfig');
           router.push('/login');
         };
 
@@ -1763,6 +2020,9 @@
         };
 
         return { 
+          handleRepeat,
+          repeatLoading,
+          repeatSuccess,
           authStore, 
           history, 
           isModalOpen, 
@@ -1825,7 +2085,19 @@
           onCardTouchMove,
           onCardTouchEnd,
           fetchPumpData,
-          titleClass
+          titleClass,
+          // HW Modal
+          isHWModalOpen,
+          hwLoading,
+          saveUserInfo,
+          // Swipe Logic
+          swipeActiveId,
+          swipeOffset,
+          isSwipeDragging,
+          onSwipeStart,
+          onSwipeMove,
+          onSwipeEnd,
+          getSwipeStyle
         };
       }
     });

@@ -16,7 +16,6 @@ export default async function handler(req, res) {
       SELECT * FROM training_records 
       WHERE user_id = ${userId}
       ORDER BY created_at DESC
-      LIMIT 100
     `;
     const records = rows.map(row => {
         // Handle created_at as seconds (integer)
