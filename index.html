@@ -658,6 +658,29 @@
             </div>
         </div>
 
+        <div v-if="activeTab === 'today'" class="fixed bottom-24 right-6 z-40">
+            <div 
+                class="relative flex items-center justify-center w-16 h-16 bg-primary text-primary-content rounded-full shadow-lg cursor-pointer transition-transform active:scale-95 select-none touch-none"
+                @touchstart.prevent="startListening"
+                @touchend.prevent="stopListening"
+                @mousedown.prevent="startListening"
+                @mouseup.prevent="stopListening"
+                @mouseleave="stopListening"
+            >
+                <!-- Ripple Effect -->
+                <div v-if="isListening" class="absolute inset-0 rounded-full bg-primary animate-ping opacity-75"></div>
+                <div v-if="isListening" class="absolute inset-[-8px] rounded-full border-2 border-primary opacity-40 animate-pulse"></div>
+                
+                <!-- Icon -->
+                <span class="text-2xl relative z-10">{{ isListening ? '🎙️' : '🎤' }}</span>
+                
+                <!-- Listening Hint -->
+                <div v-if="isListening" class="absolute bottom-full mb-4 right-0 bg-neutral text-neutral-content text-xs px-3 py-1.5 rounded-lg whitespace-nowrap backdrop-blur-md font-bold shadow-xl animate-bounce">
+                    {{ voiceTranscript || '正在听...' }}
+                </div>
+            </div>
+        </div>
+
         <!-- BOTTOM NAVIGATION -->
         <div class="btm-nav btm-nav-lg bg-base-100/90 backdrop-blur-md border-t border-base-200 z-40 rounded-t-3xl shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)]">
             <button 
@@ -691,6 +714,9 @@
           :loading="loading"
           :action="currentAction"
           :user-weight="authStore.userConfig?.weight"
+          :initial-count="initialModalCount"
+          :initial-weight="initialModalWeight"
+          :auto-submit="isModalAutoSubmit"
           @close="closeModal" 
           @confirm="handleConfirm" 
         ></number-selector-modal>
@@ -822,6 +848,18 @@
                  <span v-else>保存记录</span>
               </button>
           </div>
+          
+          <!-- Auto Submit Toast -->
+          <div v-if="autoSubmitCountdown > 0" class="absolute bottom-0 left-0 right-0 bg-base-100/95 p-6 border-t border-base-200 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.2)] z-20 flex items-center justify-between animate-slide-up pb-8">
+              <div class="flex items-center gap-3">
+                  <div class="radial-progress text-primary text-xs font-bold" :style="{'--value': (autoSubmitCountdown/5)*100, '--size': '2.5rem'}">{{ autoSubmitCountdown }}s</div>
+                  <div class="flex flex-col">
+                      <span class="font-bold text-base-content">即将自动提交</span>
+                      <span class="text-xs text-base-content/60">确认数据无误...</span>
+                  </div>
+              </div>
+              <button class="btn btn-ghost btn-sm text-error font-bold bg-error/10 hover:bg-error/20" @click="cancelAutoSubmit">取消</button>
+          </div>
         </div>
       </div>
   </script>
@@ -887,6 +925,162 @@
     </div>
   </script>
 
+  <script type="module">
+    import { pinyin } from 'https://esm.sh/pinyin-pro@3.19.6';
+    import Levenshtein from 'https://esm.sh/fast-levenshtein@3.0.0';
+    
+    window.pinyin = pinyin;
+    window.Levenshtein = Levenshtein;
+
+    // ActionMatcher Class Definition
+    class ActionMatcher {
+        constructor(actions) {
+            this.actions = actions.map(action => {
+                const label = action.label || '';
+                // Pre-calculate Pinyin (Full and Initials)
+                const pinyinFull = pinyin(label, { toneType: 'none', type: 'array' }).join('').toLowerCase();
+                const pinyinInitials = pinyin(label, { pattern: 'first', toneType: 'none', type: 'array' }).join('').toLowerCase();
+                
+                return {
+                    ...action,
+                    _pinyinFull: pinyinFull,
+                    _pinyinInitials: pinyinInitials
+                };
+            });
+        }
+
+        search(input) {
+            if (!input) return null;
+
+            // Preprocess Input
+            const inputFull = pinyin(input, { toneType: 'none', type: 'array' }).join('').toLowerCase();
+            const inputInitials = pinyin(input, { pattern: 'first', toneType: 'none', type: 'array' }).join('').toLowerCase();
+
+            let bestMatch = null;
+            let maxScore = -1;
+
+            for (const action of this.actions) {
+                let score = 0;
+                
+                // Track A: Chinese Substring (Weight: 100)
+                // "做个卧推" (input contains label) OR "引体" (label contains input)
+                if (input.includes(action.label) || action.label.includes(input)) {
+                    score = 100;
+                } else {
+                    // Track B: Full Pinyin Similarity (Weight: 70%)
+                    const distFull = window.Levenshtein.get(action._pinyinFull, inputFull);
+                    const lenFull = Math.max(action._pinyinFull.length, inputFull.length);
+                    const simFull = lenFull === 0 ? 0 : 1 - (distFull / lenFull);
+
+                    // Track C: Initials Similarity (Weight: 30%)
+                    const distInit = window.Levenshtein.get(action._pinyinInitials, inputInitials);
+                    const lenInit = Math.max(action._pinyinInitials.length, inputInitials.length);
+                    const simInit = lenInit === 0 ? 0 : 1 - (distInit / lenInit);
+
+                    // Combined Score
+                    score = (simFull * 0.7 + simInit * 0.3) * 100;
+
+                    // Bonus: Full Pinyin Substring Match (Reward: 40)
+                    if (action._pinyinFull.includes(inputFull) || inputFull.includes(action._pinyinFull)) {
+                         score += 40;
+                    }
+                }
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestMatch = action;
+                }
+            }
+            
+            // Threshold: Let's say 40? Or just return best.
+            // If score is too low, maybe it's noise. But user didn't specify threshold.
+            return bestMatch; 
+        }
+    }
+
+    window.ActionMatcher = ActionMatcher;
+
+    // Utility: Chinese Number to Arabic Number
+    const chnNumChar = {
+        '零':0, '一':1, '二':2, '两':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9
+    };
+    const chnNameValue = {
+        '十':10, '百':100, '千':1000
+    };
+
+    function chineseToNumber(text) {
+        // Replace mixed Chinese numbers in text with Arabic numbers
+        // e.g. "一百二十" -> "120", "二十五" -> "25", "三" -> "3"
+        // This is a simple regex-based replacement loop for identifying number chunks
+        
+        // Regex to find Chinese number patterns
+        const pattern = /[零一二两三四五六七八九十百千]+/g;
+        
+        return text.replace(pattern, (match) => {
+             let rtn = 0;
+             let section = 0;
+             let number = 0;
+             let secUnit = false;
+             const str = match.toString();
+             
+             // Simple parsing logic
+             let val = 0;
+             let i = 0;
+             
+             // Special case: "十" at start (e.g., 十二 -> 12, 十 -> 10)
+             if (str.length > 0 && str[0] === '十') {
+                 if (str.length === 1) return '10';
+                 // "十二" -> 1*10 + 2
+                 // Let standard loop handle it but treat initial '十' as 10
+             }
+
+             // Standard loop for < 10000
+             // e.g. 一百二十五
+             let tempVal = 0;
+             let lastUnit = 1;
+             
+             // Convert string to array of values/units
+             const tokens = [];
+             for(let char of str) {
+                 if (chnNumChar[char] !== undefined) {
+                     tokens.push({t:'num', v:chnNumChar[char]});
+                 } else if (chnNameValue[char] !== undefined) {
+                     tokens.push({t:'unit', v:chnNameValue[char]});
+                 }
+             }
+
+             // Calculate
+             let result = 0;
+             let currentNum = 0;
+             let hasNum = false;
+             
+             for (let j=0; j<tokens.length; j++) {
+                 const token = tokens[j];
+                 if (token.t === 'num') {
+                     currentNum = token.v;
+                     hasNum = true;
+                     // If it's the last digit, add it
+                     if (j === tokens.length - 1) {
+                         result += currentNum;
+                     }
+                 } else if (token.t === 'unit') {
+                     if (!hasNum && token.v === 10) {
+                         // Handling "十" at start or after zero? "十" usually implies 1*10 if no prev num
+                         currentNum = 1;
+                     }
+                     result += currentNum * token.v;
+                     currentNum = 0;
+                     hasNum = false;
+                 }
+             }
+             
+             return result.toString();
+        });
+    }
+
+    window.chineseToNumber = chineseToNumber;
+  </script>
+
   <script>
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
@@ -942,7 +1136,7 @@
     // NumberSelectorModal
     const NumberSelectorModal = defineComponent({
       template: '#modal-template',
-      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading', 'action', 'userWeight'], 
+      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading', 'action', 'userWeight', 'initialCount', 'initialWeight', 'autoSubmit'], 
       emits: ['close', 'confirm'],
       setup(props, { emit }) {
         const count = ref(10);
@@ -951,6 +1145,18 @@
         // Weight Lifted Logic
         const weightLifted = ref(10); // Default 10kg
         const weightPresets = [5, 10, 15, 20, 30, 40, 50];
+
+        // Auto Submit Logic
+        const autoSubmitCountdown = ref(0);
+        let autoSubmitTimer = null;
+
+        const cancelAutoSubmit = () => {
+            if (autoSubmitTimer) {
+                clearInterval(autoSubmitTimer);
+                autoSubmitTimer = null;
+            }
+            autoSubmitCountdown.value = 0;
+        };
         
         const isWeighted = computed(() => {
              return props.action && props.action.calc_mode && props.action.calc_mode.toLowerCase() === 'weighted';
@@ -958,9 +1164,19 @@
 
         watch(() => props.isOpen, (newVal) => {
           if (newVal) {
-            count.value = 10;
-            // Load saved weight for this action
-            if (props.action) {
+            cancelAutoSubmit(); // Clear any previous
+
+            // Count Logic
+            if (props.initialCount) {
+                count.value = parseInt(props.initialCount);
+            } else {
+                count.value = 10;
+            }
+
+            // Weight Logic
+            if (props.initialWeight) {
+                weightLifted.value = parseFloat(props.initialWeight);
+            } else if (props.action) {
                 const savedWeight = localStorage.getItem(`weight_lifted_${props.action.id}`);
                 if (savedWeight) {
                     weightLifted.value = parseInt(savedWeight);
@@ -968,6 +1184,20 @@
                     weightLifted.value = 10;
                 }
             }
+
+            // Auto Submit Start
+            if (props.autoSubmit) {
+                autoSubmitCountdown.value = 5;
+                autoSubmitTimer = setInterval(() => {
+                    autoSubmitCountdown.value--;
+                    if (autoSubmitCountdown.value <= 0) {
+                        cancelAutoSubmit(); // Stop timer
+                        confirm(); // Trigger confirm
+                    }
+                }, 1000);
+            }
+          } else {
+            cancelAutoSubmit();
           }
         });
 
@@ -1004,15 +1234,18 @@
         });
 
         const increment = () => {
+          cancelAutoSubmit();
           if (navigator.vibrate) navigator.vibrate(50);
           count.value++;
         };
         const decrement = () => {
+          cancelAutoSubmit();
           if (navigator.vibrate) navigator.vibrate(50);
           if (count.value > 1) count.value--;
         };
         
         const updateCount = (val) => {
+            cancelAutoSubmit();
             let num = parseInt(val);
             if (!isNaN(num) && num > 0) {
                 count.value = num;
@@ -1020,11 +1253,13 @@
         }
 
         const selectPreset = (val) => {
+          cancelAutoSubmit();
           if (navigator.vibrate) navigator.vibrate(50);
           count.value = val;
         };
         
         const selectWeightPreset = (val) => {
+            cancelAutoSubmit();
             if (navigator.vibrate) navigator.vibrate(50);
             weightLifted.value = val;
             // Save immediately? Or on confirm? User said "update local after setting"
@@ -1034,6 +1269,7 @@
         };
 
         const confirm = () => {
+          cancelAutoSubmit(); // Just in case
           if (navigator.vibrate) navigator.vibrate(50);
           
           // Save weight preference
@@ -1045,6 +1281,7 @@
         };
 
         const close = () => {
+          cancelAutoSubmit();
           if (!props.loading) { // Prevent closing while loading
             emit('close');
           }
@@ -1053,7 +1290,8 @@
         const loading = computed(() => props.loading);
 
         return { count, presets, estimatedKcal, increment, decrement, updateCount, selectPreset, confirm, close, loading, 
-                 isWeighted, weightLifted, weightPresets, selectWeightPreset };
+                 isWeighted, weightLifted, weightPresets, selectWeightPreset,
+                 autoSubmitCountdown, cancelAutoSubmit };
       }
     });
 
@@ -1273,6 +1511,200 @@
         
         const allActions = ref([]);
         const actionsLoading = ref(false);
+
+        // --- Voice Assistant ---
+        const isListening = ref(false);
+        const voiceTranscript = ref('');
+        let recognition = null;
+        let actionMatcher = null; // Instance of ActionMatcher
+        let debounceTimer = null; // For voice debounce
+
+        // Modal init props
+        const initialModalCount = ref(null);
+        const initialModalWeight = ref(null);
+        const isModalAutoSubmit = ref(false);
+
+        // Check browser support
+        const isSpeechSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+
+        const startListening = () => {
+            if (!isSpeechSupported) {
+                alert('您的浏览器不支持语音识别功能');
+                return;
+            }
+            
+            // Vibration feedback
+            if (navigator.vibrate) navigator.vibrate(50);
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'zh-CN';
+            recognition.interimResults = true; // Enable interim results for realtime feedback
+            recognition.maxAlternatives = 1;
+            
+            recognition.onstart = () => {
+                isListening.value = true;
+                voiceTranscript.value = '';
+            };
+            
+            recognition.onend = () => {
+                isListening.value = false;
+                // Ensure final processing happens if not already (debouncer might have one pending)
+                // But usually we process on result.
+            };
+            
+            recognition.onresult = (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                
+                voiceTranscript.value = transcript;
+            };
+            
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error', event.error);
+                isListening.value = false;
+            };
+            
+            recognition.start();
+            
+            // Auto stop after 20s
+            setTimeout(() => {
+                if (isListening.value) stopListening();
+            }, 20000);
+        };
+
+        const stopListening = () => {
+            if (recognition) {
+                recognition.stop();
+            }
+            isListening.value = false;
+            
+            // Process only when user stops listening (releases button)
+            if (voiceTranscript.value && voiceTranscript.value.trim().length > 0) {
+                processVoiceCommand(voiceTranscript.value);
+            }
+        };
+
+        const processVoiceCommand = (text) => {
+            // 0. Normalize Numbers (Chinese -> Arabic)
+            let normalized = text.toLowerCase();
+            if (window.chineseToNumber) {
+                normalized = window.chineseToNumber(normalized);
+            }
+            // Normalize units
+            normalized = normalized.replace(/千克/g, 'kg').replace(/公斤/g, 'kg').replace(/斤/g, 'kg'); // Treat 'jin' as 'kg' for simplicity or add logic
+            
+            // 1. Extract Numbers (Count and Weight)
+            let weight = null;
+            let count = null;
+            
+            // Regex strategies
+            // A. Explicit Weight: (num)kg or (weight|load)(num)
+            // B. Explicit Count: (num)(reps|sets|units) or (do)(num)
+            
+            // Weight Regex: 
+            // 1. "50kg"
+            // 2. "负重50"
+            const weightRegex = /(\d+(?:\.\d+)?)\s*(?:kg|k)|(?:负重|重量|weight)\s*(\d+(?:\.\d+)?)/;
+            const weightMatch = normalized.match(weightRegex);
+            
+            if (weightMatch) {
+                weight = weightMatch[1] || weightMatch[2];
+            }
+            
+            // Count Regex:
+            // 1. "12个", "12次", "12下", "12组"
+            // 2. "做12"
+            const countRegex = /(\d+)\s*(?:个|次|下|组|遍|rep|reps)|(?:做|做了)\s*(\d+)/;
+            const countMatch = normalized.match(countRegex);
+            
+            if (countMatch) {
+                count = countMatch[1] || countMatch[2];
+            } 
+            
+            // Fallback: If we have numbers but missed specific units
+            if (!count || !weight) {
+                // Remove matched parts to see what's left
+                let remaining = normalized;
+                if (weightMatch) remaining = remaining.replace(weightMatch[0], '');
+                if (countMatch) remaining = remaining.replace(countMatch[0], '');
+                
+                // Look for remaining numbers
+                const fallbackRegex = /(\d+)/g;
+                const matches = remaining.match(fallbackRegex);
+                
+                if (matches) {
+                    matches.forEach(num => {
+                        const val = parseFloat(num);
+                        // Heuristic: 
+                        // If we have weight but no count -> this is likely count (usually integer, small < 100)
+                        // If we have count but no weight -> this is likely weight (could be larger)
+                        // If we have neither -> 
+                        //    - If val > 100, likely weight (unless it's cardio seconds, but we assume reps for now)
+                        //    - If val <= 50, likely count? Hard to say. 
+                        //    - Usually weight is mentioned before count in "50kg 10reps" or "bench 50kg 10"
+                        
+                        if (weight && !count) {
+                            count = Math.floor(val);
+                        } else if (!weight && count) {
+                            weight = val;
+                        } else if (!weight && !count) {
+                             // First number found. Is it weight or count?
+                             // Context matters. "Bench 50" -> usually weight. "Pullups 10" -> usually count.
+                             // Let's assume: if < 30 it's count, >= 30 it's weight (risky but better than nothing)
+                             // Or better: prioritize count if no explicit weight unit found?
+                             // Most users say "10个" (count). If just "50", might be weight.
+                             if (val < 30) count = Math.floor(val);
+                             else weight = val;
+                        } else {
+                            // We have one of them, filling the other.
+                            // If we have both, maybe ignore?
+                        }
+                    });
+                }
+            }
+            
+            // 2. Match Action (Using ActionMatcher)
+            // Strip numbers and common units/punctuation to isolate the "action name" intent
+            const actionText = normalized
+                .replace(weightRegex, '') // Remove weight pattern
+                .replace(countRegex, '') // Remove count pattern
+                .replace(/\d+/g, '') // Remove any remaining digits
+                .replace(/(kg|k|个|次|下|组|遍|rep|reps)/g, '') // Remove units
+                .replace(/[.,?!。，？！]/g, '') // Remove punctuation
+                .replace(/(帮我|记录|记一下|做|一组|一个|负重|重量)/g, '') // Remove common stop words
+                .trim();
+            
+            if (!actionText) return;
+
+            // Use the Triple-Track Matcher
+            if (!actionMatcher && window.ActionMatcher) {
+                 // Fallback init if not ready
+                 actionMatcher = new window.ActionMatcher(allActions.value);
+            }
+
+            let bestMatch = null;
+            if (actionMatcher) {
+                bestMatch = actionMatcher.search(actionText);
+            }
+            
+            if (bestMatch) {
+                // Found!
+                initialModalCount.value = count;
+                initialModalWeight.value = weight;
+                isModalAutoSubmit.value = true;
+                
+                openModal(bestMatch);
+            } else {
+                // Not found - Maybe log it or show toast instead of alert for better UX during debounce
+                // console.log(`No match for: ${actionText}`);
+                // Since we are debouncing, maybe we shouldn't alert every time.
+                // Only alert if we are sure? Or maybe just do nothing until match.
+                // But user wants feedback.
+                // Let's use the voice transcript hint area for feedback "未匹配"
+            }
+        };
 
         // --- Preference Logic ---
         const categories = ['背', '胸', '肩', '腿', '核心', '手臂'];
@@ -1537,12 +1969,19 @@
                             // New fields for calorie calculation
                             met: item.met,
                             seconds_per_rep: item.seconds_per_rep,
-                            calc_mode: item.calc_mode
+                            calc_mode: item.calc_mode,
+                            // Pre-calculate Pinyin for voice matching
+                            pinyinLabel: pinyin(label, { toneType: 'none', type: 'array' }).join('').toLowerCase()
                         };
                     });
                     
                     allActions.value = mapped;
                     localStorage.setItem('cachedActions', JSON.stringify(mapped));
+
+                    // Initialize ActionMatcher
+                    if (window.ActionMatcher) {
+                        actionMatcher = new window.ActionMatcher(mapped);
+                    }
                 }
             } catch (e) {
                 console.error('Failed to fetch actions:', e);
@@ -1859,6 +2298,10 @@
 
         const closeModal = () => {
           isModalOpen.value = false;
+          // Reset Voice/Auto Submit State
+          isModalAutoSubmit.value = false;
+          initialModalCount.value = null;
+          initialModalWeight.value = null;
         };
 
         const lastRecordParams = ref(null);
@@ -2026,6 +2469,15 @@
         };
 
         return { 
+          // Voice Assistant
+          isListening,
+          voiceTranscript,
+          startListening,
+          stopListening,
+          initialModalCount,
+          initialModalWeight,
+          isModalAutoSubmit,
+
           handleRepeat,
           repeatLoading,
           repeatSuccess,
