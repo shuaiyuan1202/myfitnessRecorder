@@ -11,6 +11,7 @@
     "vercel": "^33.0.0"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.6.1",
     "@vercel/postgres": "^0.10.0",
     "axios": "^1.13.4",
     "dotenv": "^17.2.3"
