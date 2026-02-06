@@ -15,6 +15,15 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   
   <!-- Tailwind & DaisyUI -->
+  <style>
+      /* Disable long-press context menu and text selection specifically for iOS */
+      .touch-none {
+          touch-action: none;
+          -webkit-touch-callout: none !important; /* iOS Safari */
+          -webkit-user-select: none !important;   /* Safari */
+          user-select: none !important;
+      }
+  </style>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -1543,6 +1552,7 @@
             recognition = new SpeechRecognition();
             recognition.lang = 'zh-CN';
             recognition.interimResults = true; // Enable interim results for realtime feedback
+            recognition.continuous = true; // Keep listening even if user pauses
             recognition.maxAlternatives = 1;
             
             recognition.onstart = () => {
@@ -1566,7 +1576,18 @@
             
             recognition.onerror = (event) => {
                 console.error('Speech recognition error', event.error);
-                isListening.value = false;
+                if (event.error === 'not-allowed') {
+                     alert('无法访问麦克风，请在系统设置中允许浏览器访问麦克风。');
+                     isListening.value = false;
+                } else if (event.error === 'no-speech') {
+                    // Ignore no-speech, keep listening if possible, or let it end naturally
+                    // But for UX, we might want to stay in listening state until user releases
+                    console.log('No speech detected');
+                } else {
+                    voiceTranscript.value = 'Error: ' + event.error;
+                    // Don't auto close for other errors to allow user to see what happened
+                    // isListening.value = false; 
+                }
             };
             
             recognition.start();
