@@ -15,15 +15,6 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   
   <!-- Tailwind & DaisyUI -->
-  <style>
-      /* Disable long-press context menu and text selection specifically for iOS */
-      .touch-none {
-          touch-action: none;
-          -webkit-touch-callout: none !important; /* iOS Safari */
-          -webkit-user-select: none !important;   /* Safari */
-          user-select: none !important;
-      }
-  </style>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -40,6 +31,8 @@
     import { inject } from 'https://cdn.jsdelivr.net/npm/@vercel/analytics/+esm';
     inject();
   </script>
+  <!-- ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script type="text/x-template" id="preference-selector-template">
     <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="close"></div>
@@ -598,6 +591,21 @@
                             {{ historyStatsText }}
                         </p>
                     </div>
+
+                    <!-- Radar Chart -->
+                    <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 mb-6 relative">
+                        <div class="flex items-center gap-3 mb-1">
+                            <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🕸️</div>
+                            <h4 class="font-bold text-base-content/80">训练健康度雷达</h4>
+                        </div>
+                        <p class="text-xs text-base-content/40 ml-11 mb-4">基于多周期数据综合计算</p>
+                        <div ref="radarContainer" class="w-full h-80"></div>
+                        <div v-if="!scoreData" class="absolute inset-0 flex flex-col items-center justify-center bg-base-100/50 backdrop-blur-sm rounded-3xl z-10">
+                            <span class="text-sm text-base-content/40 mb-2">暂无足够数据生成图表 ({{ allHistory ? allHistory.length : 0 }})</span>
+                            <span v-if="historyError" class="text-xs text-error mb-2">{{ historyError }}</span>
+                            <button @click="fetchHistory('all')" class="btn btn-xs btn-primary">刷新数据</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -667,27 +675,6 @@
             </div>
         </div>
 
-        <div v-if="activeTab === 'today'" class="fixed bottom-24 right-6 z-40">
-            <div 
-                class="relative flex items-center justify-center w-16 h-16 bg-primary text-primary-content rounded-full shadow-lg cursor-pointer transition-transform active:scale-95 select-none touch-none"
-                @pointerdown.prevent="startListening"
-                @pointerup.prevent="stopListening"
-                @contextmenu.prevent
-            >
-                <!-- Ripple Effect -->
-                <div v-if="isListening" class="absolute inset-0 rounded-full bg-primary animate-ping opacity-75"></div>
-                <div v-if="isListening" class="absolute inset-[-8px] rounded-full border-2 border-primary opacity-40 animate-pulse"></div>
-                
-                <!-- Icon -->
-                <span class="text-2xl relative z-10">{{ isListening ? '🎙️' : '🎤' }}</span>
-                
-                <!-- Listening Hint -->
-                <div v-if="isListening" class="absolute bottom-full mb-4 right-0 bg-neutral text-neutral-content text-xs px-3 py-1.5 rounded-lg whitespace-nowrap backdrop-blur-md font-bold shadow-xl animate-bounce">
-                    {{ voiceTranscript || '正在听...' }}
-                </div>
-            </div>
-        </div>
-
         <!-- BOTTOM NAVIGATION -->
         <div class="btm-nav btm-nav-lg bg-base-100/90 backdrop-blur-md border-t border-base-200 z-40 rounded-t-3xl shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)]">
             <button 
@@ -721,9 +708,6 @@
           :loading="loading"
           :action="currentAction"
           :user-weight="authStore.userConfig?.weight"
-          :initial-count="initialModalCount"
-          :initial-weight="initialModalWeight"
-          :auto-submit="isModalAutoSubmit"
           @close="closeModal" 
           @confirm="handleConfirm" 
         ></number-selector-modal>
@@ -855,18 +839,6 @@
                  <span v-else>保存记录</span>
               </button>
           </div>
-          
-          <!-- Auto Submit Toast -->
-          <div v-if="autoSubmitCountdown > 0" class="absolute bottom-0 left-0 right-0 bg-base-100/95 p-6 border-t border-base-200 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.2)] z-20 flex items-center justify-between animate-slide-up pb-8">
-              <div class="flex items-center gap-3">
-                  <div class="radial-progress text-primary text-xs font-bold" :style="{'--value': (autoSubmitCountdown/5)*100, '--size': '2.5rem'}">{{ autoSubmitCountdown }}s</div>
-                  <div class="flex flex-col">
-                      <span class="font-bold text-base-content">即将自动提交</span>
-                      <span class="text-xs text-base-content/60">确认数据无误...</span>
-                  </div>
-              </div>
-              <button class="btn btn-ghost btn-sm text-error font-bold bg-error/10 hover:bg-error/20" @click="cancelAutoSubmit">取消</button>
-          </div>
         </div>
       </div>
   </script>
@@ -932,162 +904,6 @@
     </div>
   </script>
 
-  <script type="module">
-    import { pinyin } from 'https://esm.sh/pinyin-pro@3.19.6';
-    import Levenshtein from 'https://esm.sh/fast-levenshtein@3.0.0';
-    
-    window.pinyin = pinyin;
-    window.Levenshtein = Levenshtein;
-
-    // ActionMatcher Class Definition
-    class ActionMatcher {
-        constructor(actions) {
-            this.actions = actions.map(action => {
-                const label = action.label || '';
-                // Pre-calculate Pinyin (Full and Initials)
-                const pinyinFull = pinyin(label, { toneType: 'none', type: 'array' }).join('').toLowerCase();
-                const pinyinInitials = pinyin(label, { pattern: 'first', toneType: 'none', type: 'array' }).join('').toLowerCase();
-                
-                return {
-                    ...action,
-                    _pinyinFull: pinyinFull,
-                    _pinyinInitials: pinyinInitials
-                };
-            });
-        }
-
-        search(input) {
-            if (!input) return null;
-
-            // Preprocess Input
-            const inputFull = pinyin(input, { toneType: 'none', type: 'array' }).join('').toLowerCase();
-            const inputInitials = pinyin(input, { pattern: 'first', toneType: 'none', type: 'array' }).join('').toLowerCase();
-
-            let bestMatch = null;
-            let maxScore = -1;
-
-            for (const action of this.actions) {
-                let score = 0;
-                
-                // Track A: Chinese Substring (Weight: 100)
-                // "做个卧推" (input contains label) OR "引体" (label contains input)
-                if (input.includes(action.label) || action.label.includes(input)) {
-                    score = 100;
-                } else {
-                    // Track B: Full Pinyin Similarity (Weight: 70%)
-                    const distFull = window.Levenshtein.get(action._pinyinFull, inputFull);
-                    const lenFull = Math.max(action._pinyinFull.length, inputFull.length);
-                    const simFull = lenFull === 0 ? 0 : 1 - (distFull / lenFull);
-
-                    // Track C: Initials Similarity (Weight: 30%)
-                    const distInit = window.Levenshtein.get(action._pinyinInitials, inputInitials);
-                    const lenInit = Math.max(action._pinyinInitials.length, inputInitials.length);
-                    const simInit = lenInit === 0 ? 0 : 1 - (distInit / lenInit);
-
-                    // Combined Score
-                    score = (simFull * 0.7 + simInit * 0.3) * 100;
-
-                    // Bonus: Full Pinyin Substring Match (Reward: 40)
-                    if (action._pinyinFull.includes(inputFull) || inputFull.includes(action._pinyinFull)) {
-                         score += 40;
-                    }
-                }
-
-                if (score > maxScore) {
-                    maxScore = score;
-                    bestMatch = action;
-                }
-            }
-            
-            // Threshold: Let's say 40? Or just return best.
-            // If score is too low, maybe it's noise. But user didn't specify threshold.
-            return bestMatch; 
-        }
-    }
-
-    window.ActionMatcher = ActionMatcher;
-
-    // Utility: Chinese Number to Arabic Number
-    const chnNumChar = {
-        '零':0, '一':1, '二':2, '两':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9
-    };
-    const chnNameValue = {
-        '十':10, '百':100, '千':1000
-    };
-
-    function chineseToNumber(text) {
-        // Replace mixed Chinese numbers in text with Arabic numbers
-        // e.g. "一百二十" -> "120", "二十五" -> "25", "三" -> "3"
-        // This is a simple regex-based replacement loop for identifying number chunks
-        
-        // Regex to find Chinese number patterns
-        const pattern = /[零一二两三四五六七八九十百千]+/g;
-        
-        return text.replace(pattern, (match) => {
-             let rtn = 0;
-             let section = 0;
-             let number = 0;
-             let secUnit = false;
-             const str = match.toString();
-             
-             // Simple parsing logic
-             let val = 0;
-             let i = 0;
-             
-             // Special case: "十" at start (e.g., 十二 -> 12, 十 -> 10)
-             if (str.length > 0 && str[0] === '十') {
-                 if (str.length === 1) return '10';
-                 // "十二" -> 1*10 + 2
-                 // Let standard loop handle it but treat initial '十' as 10
-             }
-
-             // Standard loop for < 10000
-             // e.g. 一百二十五
-             let tempVal = 0;
-             let lastUnit = 1;
-             
-             // Convert string to array of values/units
-             const tokens = [];
-             for(let char of str) {
-                 if (chnNumChar[char] !== undefined) {
-                     tokens.push({t:'num', v:chnNumChar[char]});
-                 } else if (chnNameValue[char] !== undefined) {
-                     tokens.push({t:'unit', v:chnNameValue[char]});
-                 }
-             }
-
-             // Calculate
-             let result = 0;
-             let currentNum = 0;
-             let hasNum = false;
-             
-             for (let j=0; j<tokens.length; j++) {
-                 const token = tokens[j];
-                 if (token.t === 'num') {
-                     currentNum = token.v;
-                     hasNum = true;
-                     // If it's the last digit, add it
-                     if (j === tokens.length - 1) {
-                         result += currentNum;
-                     }
-                 } else if (token.t === 'unit') {
-                     if (!hasNum && token.v === 10) {
-                         // Handling "十" at start or after zero? "十" usually implies 1*10 if no prev num
-                         currentNum = 1;
-                     }
-                     result += currentNum * token.v;
-                     currentNum = 0;
-                     hasNum = false;
-                 }
-             }
-             
-             return result.toString();
-        });
-    }
-
-    window.chineseToNumber = chineseToNumber;
-  </script>
-
   <script>
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
@@ -1143,7 +959,7 @@
     // NumberSelectorModal
     const NumberSelectorModal = defineComponent({
       template: '#modal-template',
-      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading', 'action', 'userWeight', 'initialCount', 'initialWeight', 'autoSubmit'], 
+      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading', 'action', 'userWeight'], 
       emits: ['close', 'confirm'],
       setup(props, { emit }) {
         const count = ref(10);
@@ -1152,18 +968,6 @@
         // Weight Lifted Logic
         const weightLifted = ref(10); // Default 10kg
         const weightPresets = [5, 10, 15, 20, 30, 40, 50];
-
-        // Auto Submit Logic
-        const autoSubmitCountdown = ref(0);
-        let autoSubmitTimer = null;
-
-        const cancelAutoSubmit = () => {
-            if (autoSubmitTimer) {
-                clearInterval(autoSubmitTimer);
-                autoSubmitTimer = null;
-            }
-            autoSubmitCountdown.value = 0;
-        };
         
         const isWeighted = computed(() => {
              return props.action && props.action.calc_mode && props.action.calc_mode.toLowerCase() === 'weighted';
@@ -1171,19 +975,9 @@
 
         watch(() => props.isOpen, (newVal) => {
           if (newVal) {
-            cancelAutoSubmit(); // Clear any previous
-
-            // Count Logic
-            if (props.initialCount) {
-                count.value = parseInt(props.initialCount);
-            } else {
-                count.value = 10;
-            }
-
-            // Weight Logic
-            if (props.initialWeight) {
-                weightLifted.value = parseFloat(props.initialWeight);
-            } else if (props.action) {
+            count.value = 10;
+            // Load saved weight for this action
+            if (props.action) {
                 const savedWeight = localStorage.getItem(`weight_lifted_${props.action.id}`);
                 if (savedWeight) {
                     weightLifted.value = parseInt(savedWeight);
@@ -1191,20 +985,6 @@
                     weightLifted.value = 10;
                 }
             }
-
-            // Auto Submit Start
-            if (props.autoSubmit) {
-                autoSubmitCountdown.value = 5;
-                autoSubmitTimer = setInterval(() => {
-                    autoSubmitCountdown.value--;
-                    if (autoSubmitCountdown.value <= 0) {
-                        cancelAutoSubmit(); // Stop timer
-                        confirm(); // Trigger confirm
-                    }
-                }, 1000);
-            }
-          } else {
-            cancelAutoSubmit();
           }
         });
 
@@ -1241,18 +1021,15 @@
         });
 
         const increment = () => {
-          cancelAutoSubmit();
           if (navigator.vibrate) navigator.vibrate(50);
           count.value++;
         };
         const decrement = () => {
-          cancelAutoSubmit();
           if (navigator.vibrate) navigator.vibrate(50);
           if (count.value > 1) count.value--;
         };
         
         const updateCount = (val) => {
-            cancelAutoSubmit();
             let num = parseInt(val);
             if (!isNaN(num) && num > 0) {
                 count.value = num;
@@ -1260,13 +1037,11 @@
         }
 
         const selectPreset = (val) => {
-          cancelAutoSubmit();
           if (navigator.vibrate) navigator.vibrate(50);
           count.value = val;
         };
         
         const selectWeightPreset = (val) => {
-            cancelAutoSubmit();
             if (navigator.vibrate) navigator.vibrate(50);
             weightLifted.value = val;
             // Save immediately? Or on confirm? User said "update local after setting"
@@ -1276,7 +1051,6 @@
         };
 
         const confirm = () => {
-          cancelAutoSubmit(); // Just in case
           if (navigator.vibrate) navigator.vibrate(50);
           
           // Save weight preference
@@ -1288,7 +1062,6 @@
         };
 
         const close = () => {
-          cancelAutoSubmit();
           if (!props.loading) { // Prevent closing while loading
             emit('close');
           }
@@ -1297,8 +1070,7 @@
         const loading = computed(() => props.loading);
 
         return { count, presets, estimatedKcal, increment, decrement, updateCount, selectPreset, confirm, close, loading, 
-                 isWeighted, weightLifted, weightPresets, selectWeightPreset,
-                 autoSubmitCountdown, cancelAutoSubmit };
+                 isWeighted, weightLifted, weightPresets, selectWeightPreset };
       }
     });
 
@@ -1475,6 +1247,7 @@
         const history = ref([]);
         const allHistory = ref([]);
         const historyLoading = ref(false); // New
+        const historyError = ref(''); // New
         const activeTab = ref('today'); // 'today', 'history', 'pump'
         const isModalOpen = ref(false);
         const isRestTimerOpen = ref(false);
@@ -1518,234 +1291,6 @@
         
         const allActions = ref([]);
         const actionsLoading = ref(false);
-
-        // --- Voice Assistant ---
-        const isListening = ref(false);
-        const voiceTranscript = ref('');
-        let recognition = null;
-        let actionMatcher = null; // Instance of ActionMatcher
-        let debounceTimer = null; // For voice debounce
-
-        // Modal init props
-        const initialModalCount = ref(null);
-        const initialModalWeight = ref(null);
-        const isModalAutoSubmit = ref(false);
-
-        // Check browser support
-        const isSpeechSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-
-        const startListening = () => {
-            if (!isSpeechSupported) {
-                alert('您的浏览器不支持语音识别功能');
-                return;
-            }
-            
-            // Check for Secure Context (Required for Mic)
-            if (!window.isSecureContext) {
-                 alert('语音识别需要HTTPS或Localhost环境。当前环境不安全，无法访问麦克风。');
-                 return;
-            }
-
-            // Prevent multiple instances
-            if (isListening.value) return;
-
-            // Vibration feedback (Android only usually)
-            try {
-                if (navigator.vibrate) navigator.vibrate(50);
-            } catch(e) {}
-            
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            recognition.lang = 'zh-CN';
-            recognition.interimResults = true; // Enable interim results for realtime feedback
-            recognition.continuous = true; // Keep listening even if user pauses
-            recognition.maxAlternatives = 1;
-            
-            recognition.onstart = () => {
-                isListening.value = true;
-                voiceTranscript.value = '';
-            };
-            
-            recognition.onend = () => {
-                // Only set to false if we didn't intend to stop?
-                // Actually, let's keep it simple. If it ends, it ends.
-                // But if it ends unexpectedly (without user release), we might want to know why.
-                if (isListening.value) {
-                    console.log('Recognition ended unexpectedly');
-                    isListening.value = false;
-                }
-            };
-            
-            recognition.onresult = (event) => {
-                const transcript = Array.from(event.results)
-                    .map(result => result[0].transcript)
-                    .join('');
-                
-                voiceTranscript.value = transcript;
-            };
-            
-            recognition.onerror = (event) => {
-                console.error('Speech recognition error', event.error);
-                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                     alert('无法访问麦克风或语音服务。\n\n1. 请确保使用 HTTPS 协议或 localhost。\n2. 请检查系统设置 > 隐私 > 麦克风权限。');
-                     isListening.value = false;
-                } else if (event.error === 'no-speech') {
-                    // Ignore no-speech, keep listening
-                    console.log('No speech detected');
-                } else if (event.error === 'aborted') {
-                    // Ignore aborted (user stopped or system interruption)
-                    // Do NOT set isListening to false here immediately, as it might be a temporary system hiccup
-                    console.log('Recognition aborted');
-                } else {
-                    alert('语音识别错误: ' + event.error);
-                    isListening.value = false; 
-                }
-            };
-            
-            try {
-                recognition.start();
-            } catch (e) {
-                console.error('Failed to start recognition:', e);
-                // alert('无法启动语音识别: ' + e.message);
-            }
-            
-            // Auto stop after 20s
-            setTimeout(() => {
-                if (isListening.value) stopListening();
-            }, 20000);
-        };
-
-        const stopListening = () => {
-            if (recognition) {
-                recognition.stop();
-            }
-            isListening.value = false;
-            
-            // Process only when user stops listening (releases button)
-            if (voiceTranscript.value && voiceTranscript.value.trim().length > 0) {
-                processVoiceCommand(voiceTranscript.value);
-            }
-        };
-
-        const processVoiceCommand = (text) => {
-            // 0. Normalize Numbers (Chinese -> Arabic)
-            let normalized = text.toLowerCase();
-            if (window.chineseToNumber) {
-                normalized = window.chineseToNumber(normalized);
-            }
-            // Normalize units
-            normalized = normalized.replace(/千克/g, 'kg').replace(/公斤/g, 'kg').replace(/斤/g, 'kg'); // Treat 'jin' as 'kg' for simplicity or add logic
-            
-            // 1. Extract Numbers (Count and Weight)
-            let weight = null;
-            let count = null;
-            
-            // Regex strategies
-            // A. Explicit Weight: (num)kg or (weight|load)(num)
-            // B. Explicit Count: (num)(reps|sets|units) or (do)(num)
-            
-            // Weight Regex: 
-            // 1. "50kg"
-            // 2. "负重50"
-            const weightRegex = /(\d+(?:\.\d+)?)\s*(?:kg|k)|(?:负重|重量|weight)\s*(\d+(?:\.\d+)?)/;
-            const weightMatch = normalized.match(weightRegex);
-            
-            if (weightMatch) {
-                weight = weightMatch[1] || weightMatch[2];
-            }
-            
-            // Count Regex:
-            // 1. "12个", "12次", "12下", "12组"
-            // 2. "做12"
-            const countRegex = /(\d+)\s*(?:个|次|下|组|遍|rep|reps)|(?:做|做了)\s*(\d+)/;
-            const countMatch = normalized.match(countRegex);
-            
-            if (countMatch) {
-                count = countMatch[1] || countMatch[2];
-            } 
-            
-            // Fallback: If we have numbers but missed specific units
-            if (!count || !weight) {
-                // Remove matched parts to see what's left
-                let remaining = normalized;
-                if (weightMatch) remaining = remaining.replace(weightMatch[0], '');
-                if (countMatch) remaining = remaining.replace(countMatch[0], '');
-                
-                // Look for remaining numbers
-                const fallbackRegex = /(\d+)/g;
-                const matches = remaining.match(fallbackRegex);
-                
-                if (matches) {
-                    matches.forEach(num => {
-                        const val = parseFloat(num);
-                        // Heuristic: 
-                        // If we have weight but no count -> this is likely count (usually integer, small < 100)
-                        // If we have count but no weight -> this is likely weight (could be larger)
-                        // If we have neither -> 
-                        //    - If val > 100, likely weight (unless it's cardio seconds, but we assume reps for now)
-                        //    - If val <= 50, likely count? Hard to say. 
-                        //    - Usually weight is mentioned before count in "50kg 10reps" or "bench 50kg 10"
-                        
-                        if (weight && !count) {
-                            count = Math.floor(val);
-                        } else if (!weight && count) {
-                            weight = val;
-                        } else if (!weight && !count) {
-                             // First number found. Is it weight or count?
-                             // Context matters. "Bench 50" -> usually weight. "Pullups 10" -> usually count.
-                             // Let's assume: if < 30 it's count, >= 30 it's weight (risky but better than nothing)
-                             // Or better: prioritize count if no explicit weight unit found?
-                             // Most users say "10个" (count). If just "50", might be weight.
-                             if (val < 30) count = Math.floor(val);
-                             else weight = val;
-                        } else {
-                            // We have one of them, filling the other.
-                            // If we have both, maybe ignore?
-                        }
-                    });
-                }
-            }
-            
-            // 2. Match Action (Using ActionMatcher)
-            // Strip numbers and common units/punctuation to isolate the "action name" intent
-            const actionText = normalized
-                .replace(weightRegex, '') // Remove weight pattern
-                .replace(countRegex, '') // Remove count pattern
-                .replace(/\d+/g, '') // Remove any remaining digits
-                .replace(/(kg|k|个|次|下|组|遍|rep|reps)/g, '') // Remove units
-                .replace(/[.,?!。，？！]/g, '') // Remove punctuation
-                .replace(/(帮我|记录|记一下|做|一组|一个|负重|重量)/g, '') // Remove common stop words
-                .trim();
-            
-            if (!actionText) return;
-
-            // Use the Triple-Track Matcher
-            if (!actionMatcher && window.ActionMatcher) {
-                 // Fallback init if not ready
-                 actionMatcher = new window.ActionMatcher(allActions.value);
-            }
-
-            let bestMatch = null;
-            if (actionMatcher) {
-                bestMatch = actionMatcher.search(actionText);
-            }
-            
-            if (bestMatch) {
-                // Found!
-                initialModalCount.value = count;
-                initialModalWeight.value = weight;
-                isModalAutoSubmit.value = true;
-                
-                openModal(bestMatch);
-            } else {
-                // Not found - Maybe log it or show toast instead of alert for better UX during debounce
-                // console.log(`No match for: ${actionText}`);
-                // Since we are debouncing, maybe we shouldn't alert every time.
-                // Only alert if we are sure? Or maybe just do nothing until match.
-                // But user wants feedback.
-                // Let's use the voice transcript hint area for feedback "未匹配"
-            }
-        };
 
         // --- Preference Logic ---
         const categories = ['背', '胸', '肩', '腿', '核心', '手臂'];
@@ -2011,18 +1556,12 @@
                             met: item.met,
                             seconds_per_rep: item.seconds_per_rep,
                             calc_mode: item.calc_mode,
-                            // Pre-calculate Pinyin for voice matching
-                            pinyinLabel: pinyin(label, { toneType: 'none', type: 'array' }).join('').toLowerCase()
+                            mechanic_type: item.mechanic_type
                         };
                     });
                     
                     allActions.value = mapped;
                     localStorage.setItem('cachedActions', JSON.stringify(mapped));
-
-                    // Initialize ActionMatcher
-                    if (window.ActionMatcher) {
-                        actionMatcher = new window.ActionMatcher(mapped);
-                    }
                 }
             } catch (e) {
                 console.error('Failed to fetch actions:', e);
@@ -2063,6 +1602,7 @@
             if (range === 'all') historyLoading.value = true;
 
             try {
+                historyError.value = '';
                 const response = await axios.post('/api/get-history', {
                     userId: userId,
                     appToken: config.fs_app_token,
@@ -2091,7 +1631,9 @@
                             date: item.createdTime,
                             actionType: action ? action.label : actionId,
                             count: fields.count,
-                            kcal: kcal || 0
+                            kcal: kcal || 0,
+                            weight: fields.weight_lifted || 0,
+                            mechanic_type: action ? action.mechanic_type : null
                         };
                     });
 
@@ -2101,12 +1643,15 @@
                             const d = new Date(item.date);
                             return d.toDateString() === todayStr;
                         });
+                        // Since API returns all data, we can also populate allHistory to avoid re-fetch
+                        allHistory.value = mappedData;
                     } else {
                         allHistory.value = mappedData;
                     }
                 }
             } catch (error) {
                 console.error('Failed to fetch history:', error);
+                historyError.value = error.message || '获取数据失败';
             } finally {
                 initLoading.value = false;
                 if (range === 'all') historyLoading.value = false;
@@ -2321,6 +1866,235 @@
             return `本月共运动 ${uniqueDays} 天，完成运动 ${totalSets} 组`;
         });
 
+        // --- Radar Chart Logic ---
+        const radarContainer = ref(null);
+        let radarChart = null;
+
+        const scoreData = computed(() => {
+            if (allHistory.value.length === 0) return null;
+
+            const scores = {
+                '胸': { vol: 0, int: 0, con: 0, bal: 0 },
+                '背': { vol: 0, int: 0, con: 0, bal: 0 },
+                '腿': { vol: 0, int: 0, con: 0, bal: 0 },
+                '肩': { vol: 0, int: 0, con: 0, bal: 0 },
+                '臂': { vol: 0, int: 0, con: 0, bal: 0 },
+                '核心': { vol: 0, int: 0, con: 0, bal: 0 }
+            };
+
+            const muscleGroups = Object.keys(scores);
+            const userWeight = authStore.userConfig?.weight || 70;
+            const now = new Date();
+            const oneDay = 24 * 60 * 60 * 1000;
+            const sevenDaysAgo = new Date(now.getTime() - 7 * oneDay);
+            const twentyOneDaysAgo = new Date(now.getTime() - 21 * oneDay);
+            const twentyEightDaysAgo = new Date(now.getTime() - 28 * oneDay);
+            const fortyFiveDaysAgo = new Date(now.getTime() - 45 * oneDay);
+
+            // Helper: Group history by muscle
+            const historyByMuscle = {};
+            muscleGroups.forEach(m => historyByMuscle[m] = []);
+
+            // Helper: Global Stats for Balance (Last 21 Days)
+            const balanceStats = { push: 0, pull: 0, squat: 0, hinge: 0 };
+
+            allHistory.value.forEach(record => {
+                const action = allActions.value.find(a => a.label === record.actionType || a.name === record.actionType);
+                if (!action) return;
+                
+                // Map muscle group
+                let muscle = '其他';
+                const target = action.target_muscle_group || '';
+                if (target.includes('胸')) muscle = '胸';
+                else if (target.includes('背')) muscle = '背';
+                else if (target.includes('腿') || target.includes('Leg')) muscle = '腿';
+                else if (target.includes('肩')) muscle = '肩';
+                else if (target.includes('臂')) muscle = '臂';
+                else if (target.includes('腹') || target.includes('Abs') || target.includes('核心')) muscle = '核心';
+
+                if (scores[muscle]) {
+                    historyByMuscle[muscle].push(record);
+                }
+
+                // Balance Stats (Last 21 days)
+                const recordDate = new Date(record.date);
+                if (recordDate >= twentyOneDaysAgo) {
+                     let type = record.mechanic_type || action.mechanic_type;
+                     if (!type) {
+                         // Fallback Inference
+                         if (muscle === '胸' || muscle === '肩' || (muscle === '臂' && action.name.toLowerCase().includes('tricep'))) type = 'push';
+                         else if (muscle === '背' || (muscle === '臂' && action.name.toLowerCase().includes('bicep'))) type = 'pull';
+                         else if (muscle === '腿') {
+                             if (action.name.toLowerCase().includes('deadlift') || action.name.includes('硬拉')) type = 'hinge_pattern';
+                             else type = 'squat_pattern';
+                         }
+                     }
+
+                     if (type === 'push') balanceStats.push += 1;
+                     if (type === 'pull') balanceStats.pull += 1;
+                     if (type === 'squat_pattern' || type === 'squat') balanceStats.squat += 1;
+                     if (type === 'hinge_pattern' || type === 'hinge') balanceStats.hinge += 1;
+                }
+            });
+
+            // Calculate Scores per Muscle
+            muscleGroups.forEach(muscle => {
+                const logs = historyByMuscle[muscle];
+                
+                // 1. Volume (Last 7 Days)
+                const last7DaysLogs = logs.filter(r => new Date(r.date) >= sevenDaysAgo);
+                const S = last7DaysLogs.length; 
+                let scoreVol = 0;
+                if (S < 4) scoreVol = 20 + (S / 4) * 40;
+                else if (S < 10) scoreVol = 60 + ((S - 4) / 6) * 30;
+                else if (S <= 20) scoreVol = 100;
+                else scoreVol = 100 - (S - 20) * 2;
+                scores[muscle].vol = Math.max(0, Math.min(100, scoreVol));
+
+                // 2. Intensity (Max Weight Ratio) - Last 45 Days
+                const last45DaysLogs = logs.filter(r => new Date(r.date) >= fortyFiveDaysAgo);
+                let max1RM = 0;
+                last45DaysLogs.forEach(r => {
+                    const w = parseFloat(r.weight || 0);
+                    const reps = parseFloat(r.count || 0);
+                    if (w > 0 && reps > 0) {
+                        const est1RM = w * (1 + reps / 30);
+                        if (est1RM > max1RM) max1RM = est1RM;
+                    }
+                });
+                
+                if (max1RM > 0) {
+                    const ratio = max1RM / userWeight;
+                    let kStd = 1.0;
+                    if (muscle === '胸') kStd = 1.5;
+                    else if (muscle === '背') kStd = 2.0; 
+                    else if (muscle === '腿') kStd = 2.0;
+                    else if (muscle === '肩') kStd = 0.9;
+                    
+                    let scoreInt = Math.min((ratio / kStd) * 100, 120);
+                    scores[muscle].int = scoreInt;
+                }
+
+                // 3. Consistency (Days since last) - Last 28 Days Check
+                const last28DaysLogs = logs.filter(r => new Date(r.date) >= twentyEightDaysAgo);
+                if (last28DaysLogs.length > 0) {
+                    last28DaysLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    const lastDate = new Date(last28DaysLogs[0].date);
+                    const daysGap = Math.floor((now - lastDate) / oneDay);
+                    
+                    let scoreCon = 0;
+                    if (daysGap <= 3) scoreCon = 100;
+                    else if (daysGap <= 5) scoreCon = 85;
+                    else if (daysGap <= 7) scoreCon = 60;
+                    else if (daysGap <= 14) scoreCon = 40; // 7-14 days: 40
+                    else if (daysGap <= 21) scoreCon = 20; // 14-21 days: 20
+                    else scoreCon = 10; // 21-28 days: 10
+                    scores[muscle].con = scoreCon;
+                } else {
+                    scores[muscle].con = 0;
+                }
+
+                // 4. Balance
+                let scoreBal = 100;
+                if (muscle === '胸' || muscle === '肩' || muscle === '背' || muscle === '臂') {
+                    const num = Math.min(balanceStats.push, balanceStats.pull);
+                    const den = Math.max(balanceStats.push, balanceStats.pull);
+                    scoreBal = den === 0 ? 0 : (num / den) * 100;
+                } else if (muscle === '腿') {
+                    const num = Math.min(balanceStats.squat, balanceStats.hinge);
+                    const den = Math.max(balanceStats.squat, balanceStats.hinge);
+                    scoreBal = den === 0 ? 0 : (num / den) * 100;
+                }
+                scores[muscle].bal = scoreBal;
+            });
+
+            return muscleGroups.map(m => {
+                const s = scores[m];
+                // Only count non-zero components? Or straight average? 
+                // Usually straight average encourages roundedness.
+                // However, if Intensity is 0 (bodyweight only), it punishes score.
+                // Let's stick to straight average as per typical game charts.
+                const total = s.vol + s.int + s.con + s.bal;
+                return Math.round(total / 4);
+            });
+        });
+
+        const initRadarChart = () => {
+             if (!radarContainer.value || !scoreData.value) return;
+             if (radarChart) radarChart.dispose();
+             
+             radarChart = echarts.init(radarContainer.value);
+             const option = {
+                 color: ['#6366f1'],
+                 radar: {
+                     indicator: [
+                        { name: '胸', max: 100 },
+                        { name: '背', max: 100 },
+                        { name: '腿', max: 100 },
+                        { name: '肩', max: 100 },
+                        { name: '臂', max: 100 },
+                        { name: '核心', max: 100 }
+                     ],
+                     axisName: {
+                        color: '#374151',
+                        fontWeight: 'bold',
+                        fontSize: 14,
+                        padding: [5, 5]
+                     },
+                     name: {
+                        textStyle: {
+                            color: '#374151',
+                            fontWeight: 'bold',
+                            fontSize: 14,
+                            padding: [5, 5]
+                        }
+                     },
+                     splitArea: {
+                        areaStyle: {
+                            color: ['rgba(99, 102, 241, 0.05)', 'rgba(99, 102, 241, 0.1)']
+                        }
+                     },
+                     axisLine: { lineStyle: { color: 'rgba(0, 0, 0, 0.1)' } },
+                     splitLine: { lineStyle: { color: 'rgba(0, 0, 0, 0.1)' } }
+                 },
+                 series: [{
+                     type: 'radar',
+                     data: [
+                         {
+                             value: scoreData.value,
+                             name: '训练评分',
+                             areaStyle: {
+                                 color: 'rgba(99, 102, 241, 0.5)'
+                             },
+                             lineStyle: {
+                                 width: 3
+                             },
+                             symbol: 'circle',
+                             symbolSize: 6
+                         }
+                     ]
+                 }]
+             };
+             radarChart.setOption(option);
+             
+             // Resize handler
+             window.addEventListener('resize', () => {
+                 radarChart && radarChart.resize();
+             });
+        };
+
+        watch(activeTab, (val) => {
+             if (val === 'history') {
+                 setTimeout(() => initRadarChart(), 100);
+             }
+        });
+
+        watch(allHistory, () => {
+             if (activeTab.value === 'history') {
+                 setTimeout(() => initRadarChart(), 100);
+             }
+        });
+
         const todayRecords = computed(() => {
           const today = new Date().toDateString();
           return history.value.filter(record => new Date(record.date).toDateString() === today);
@@ -2339,10 +2113,6 @@
 
         const closeModal = () => {
           isModalOpen.value = false;
-          // Reset Voice/Auto Submit State
-          isModalAutoSubmit.value = false;
-          initialModalCount.value = null;
-          initialModalWeight.value = null;
         };
 
         const lastRecordParams = ref(null);
@@ -2386,6 +2156,8 @@
                  history.value.unshift(localRecord);
                  if (allHistory.value.length > 0) {
                      allHistory.value.unshift(localRecord);
+                 } else {
+                     allHistory.value = [localRecord];
                  }
                  
                  // Play finish sound
@@ -2510,15 +2282,6 @@
         };
 
         return { 
-          // Voice Assistant
-          isListening,
-          voiceTranscript,
-          startListening,
-          stopListening,
-          initialModalCount,
-          initialModalWeight,
-          isModalAutoSubmit,
-
           handleRepeat,
           repeatLoading,
           repeatSuccess,
@@ -2552,6 +2315,10 @@
           historyStatsText,
           allHistory,
           historyLoading, // Added this
+          historyError,
+          fetchHistory,
+          scoreData,
+          radarContainer,
           // Preferences
           categories,
           activeCategory,
