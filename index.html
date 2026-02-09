@@ -380,20 +380,6 @@
                            <span class="text-xl font-bold text-primary">{{ userInitial }}</span>
                         </div>
                         <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100 rounded-2xl w-40 border border-base-200">
-                          <li>
-                            <details open>
-                              <summary class="font-medium">主题色</summary>
-                              <ul class="p-2 bg-base-100 rounded-t-none flex flex-wrap gap-1">
-                                <li v-for="theme in themes" :key="theme.name" class="w-full">
-                                    <a @click="setTheme(theme.value)" class="flex justify-between items-center" :class="{'active': currentTheme === theme.value}">
-                                        <span>{{ theme.name }}</span>
-                                        <span class="w-3 h-3 rounded-full" :style="{ backgroundColor: theme.color }"></span>
-                                    </a>
-                                </li>
-                              </ul>
-                            </details>
-                          </li>
-                          <div class="divider my-0"></div>
                           <li><a @click="logout" class="text-error font-medium">退出登录</a></li>
                         </ul>
                      </div>
@@ -455,7 +441,18 @@
                          <div class="w-10 h-10 rounded-full flex items-center justify-center text-xl mb-1" :class="action.color">
                              {{ action.icon }}
                          </div>
-                         <div class="text-[10px] font-bold text-center leading-tight text-base-content/80 line-clamp-2">{{ action.label }}</div>
+                         <div class="text-[10px] font-bold text-center leading-tight text-base-content/80 line-clamp-2 z-10 relative">{{ action.label }}</div>
+                         
+                         <!-- Dots Indicator -->
+                         <div v-if="getTodaySetsForAction(action.label) > 0" class="flex gap-[2px] justify-center mt-1.5 w-full px-2 overflow-hidden">
+                            <div v-for="n in getTodaySetsForAction(action.label)" :key="n" class="w-1 h-1 rounded-full bg-primary shrink-0"></div>
+                         </div>
+
+                         <!-- Top-right Counter -->
+                         <div v-if="getTodaySetsForAction(action.label) > 0" class="absolute top-1.5 right-2 text-primary/60 font-bold leading-none flex items-baseline select-none" style="opacity: 0.4;">
+                             <span class="text-[9px] mr-[1px]">×</span>
+                             <span class="text-sm">{{ getTodaySetsForAction(action.label) }}</span>
+                         </div>
                       </button>
 
                       <!-- Add Button (Weak) -->
@@ -1317,24 +1314,6 @@
         const isAnimating = ref(false); // New
         const isResetting = ref(false); // New
         
-        // Theme Logic
-        const currentTheme = ref(localStorage.getItem('theme') || 'fittrack');
-        const themes = [
-            { name: '默认紫', value: 'fittrack', color: '#6366f1' },
-            { name: '活力红', value: 'red', color: '#ef4444' },
-            { name: '极夜黑', value: 'black', color: '#1f2937' },
-            { name: '自然绿', value: 'green', color: '#10b981' },
-            { name: '天空蓝', value: 'blue', color: '#3b82f6' },
-            { name: '暖阳橙', value: 'orange', color: '#f97316' },
-            { name: '青色', value: 'cyan', color: '#06b6d4' }
-        ];
-
-        const setTheme = (theme) => {
-            currentTheme.value = theme;
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('theme', theme);
-        };
-        
         // Touch handling for general swipe (removed for tabs, but kept logic vars if needed)
         // const touchStartX = ref(0);
         // const touchEndX = ref(0);
@@ -1440,9 +1419,6 @@
 
         // Load preferred actions and Init
         onMounted(async () => {
-            // 1. Initialize Theme
-            document.documentElement.setAttribute('data-theme', currentTheme.value);
-
             // 2. Load Preferred Actions
             // Priority: LocalStorage -> UserConfig (fallback)
             let loaded = false;
@@ -2159,6 +2135,14 @@
 
         const todaySets = computed(() => todayRecords.value.length);
 
+        const getTodaySetsForAction = (actionName) => {
+            const today = new Date().toDateString();
+            return history.value.filter(record => 
+                (record.actionType === actionName || record.actionType === allActions.value.find(a => a.name === actionName)?.label) && 
+                new Date(record.date).toDateString() === today
+            ).length;
+        };
+
         const openModal = (action) => {
           currentAction.value = action;
           isModalOpen.value = true;
@@ -2384,18 +2368,6 @@
           initialModalSelected,
           preferenceSaving,
           savePreferences,
-          // Theme
-          themes: [
-            { name: '默认紫', value: 'light', color: '#6366f1' },
-            { name: '活力红', value: 'valentine', color: '#ef4444' },
-            { name: '极夜黑', value: 'black', color: '#1f2937' },
-            { name: '自然绿', value: 'emerald', color: '#10b981' },
-            { name: '天空蓝', value: 'corporate', color: '#3b82f6' },
-            { name: '暖阳橙', value: 'halloween', color: '#f97316' },
-            { name: '青色', value: 'aqua', color: '#06b6d4' }
-          ],
-          currentTheme,
-          setTheme,
           // Pump
           pumpData,
           currentCard,
@@ -2410,6 +2382,8 @@
           isHWModalOpen,
           hwLoading,
           saveUserInfo,
+          // Stats
+          getTodaySetsForAction,
           // Swipe Logic
           swipeActiveId,
           swipeOffset,
