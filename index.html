@@ -495,7 +495,15 @@
                          <!-- Content -->
                          <!-- Wrapper for Swipe -->
                          <div class="relative overflow-hidden rounded-2xl">
-                             <!-- Delete Action Background -->
+                             <!-- Repeat Action Background (Left) -->
+                             <div 
+                                 class="absolute inset-y-0 left-0 w-20 bg-success/10 text-success flex flex-col items-center justify-center transition-colors"
+                             >
+                                 <span class="text-lg font-bold">+</span>
+                                 <span class="text-xs font-bold">再来</span>
+                             </div>
+
+                             <!-- Delete Action Background (Right) -->
                              <div 
                                  class="absolute inset-y-0 right-0 w-20 bg-error/10 text-error flex flex-col items-center justify-center cursor-pointer active:bg-error/20 transition-colors"
                                  @click.stop="deleteRecord(record.id)"
@@ -709,9 +717,11 @@
           :kcal-per-rep="currentAction.kcal" 
           :loading="loading"
           :action="currentAction"
-          :user-weight="authStore.userConfig?.weight"
-          @close="closeModal" 
-          @confirm="handleConfirm" 
+          :user-weight="authStore.userConfig?.configuration?.weight"
+          :initial-count="repeatInitialCount"
+          :initial-weight="repeatInitialWeight"
+          @close="closeModal"
+          @confirm="handleConfirm"
         ></number-selector-modal>
 
         <preference-selector-modal
@@ -1006,7 +1016,7 @@
     // NumberSelectorModal
     const NumberSelectorModal = defineComponent({
       template: '#modal-template',
-      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading', 'action', 'userWeight'], 
+      props: ['isOpen', 'title', 'description', 'kcalPerRep', 'loading', 'action', 'userWeight', 'initialCount', 'initialWeight'], 
       emits: ['close', 'confirm'],
       setup(props, { emit }) {
         const count = ref(10);
@@ -1022,14 +1032,24 @@
 
         watch(() => props.isOpen, (newVal) => {
           if (newVal) {
-            count.value = 10;
-            // Load saved weight for this action
+            // Count Logic: Priority: initialCount prop > 10
+            if (props.initialCount) {
+                count.value = parseInt(props.initialCount);
+            } else {
+                count.value = 10;
+            }
+
+            // Weight Logic: Priority: initialWeight prop > localStorage > 10
             if (props.action) {
-                const savedWeight = localStorage.getItem(`weight_lifted_${props.action.id}`);
-                if (savedWeight) {
-                    weightLifted.value = parseInt(savedWeight);
+                if (props.initialWeight) {
+                    weightLifted.value = parseInt(props.initialWeight);
                 } else {
-                    weightLifted.value = 10;
+                    const savedWeight = localStorage.getItem(`weight_lifted_${props.action.id}`);
+                    if (savedWeight) {
+                        weightLifted.value = parseInt(savedWeight);
+                    } else {
+                        weightLifted.value = 10;
+                    }
                 }
             }
           }
@@ -1367,16 +1387,18 @@
         const swipeStartX = ref(0);
 
         const onSwipeStart = (e, id) => {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
             if (swipeActiveId.value && swipeActiveId.value !== id) {
                 swipeActiveId.value = null;
                 swipeOffset.value = 0;
             }
 
             if (swipeActiveId.value === id) {
-                swipeStartX.value = e.touches[0].clientX - swipeOffset.value;
+                swipeStartX.value = clientX - swipeOffset.value;
             } else {
                 swipeActiveId.value = id;
-                swipeStartX.value = e.touches[0].clientX;
+                swipeStartX.value = clientX;
                 swipeOffset.value = 0;
             }
             isSwipeDragging.value = true;
@@ -1385,11 +1407,12 @@
         const onSwipeMove = (e) => {
             if (!isSwipeDragging.value || !swipeActiveId.value) return;
             
-            const currentX = e.touches[0].clientX;
-            const diff = currentX - swipeStartX.value;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const diff = clientX - swipeStartX.value;
             
+            // Allow swiping right (up to 80px) and left (up to -80px)
             if (diff < -80) swipeOffset.value = -80;
-            else if (diff > 0) swipeOffset.value = 0;
+            else if (diff > 80) swipeOffset.value = 80;
             else swipeOffset.value = diff;
         };
 
@@ -1398,8 +1421,19 @@
             if (!swipeActiveId.value) return;
 
             if (swipeOffset.value < -40) {
+                // Keep delete button open
                 swipeOffset.value = -80; 
+            } else if (swipeOffset.value > 40) {
+                // Trigger repeat action immediately
+                const record = history.value.find(r => r.id === swipeActiveId.value);
+                if (record) {
+                    repeatRecord(record);
+                } else {
+                    swipeOffset.value = 0;
+                    swipeActiveId.value = null;
+                }
             } else {
+                // Reset
                 swipeOffset.value = 0;   
                 swipeActiveId.value = null;
             }
@@ -2143,9 +2177,36 @@
             ).length;
         };
 
-        const openModal = (action) => {
+        const repeatInitialCount = ref(null);
+        const repeatInitialWeight = ref(null);
+
+        const openModal = (action, initialData = null) => {
           currentAction.value = action;
+          if (initialData) {
+              repeatInitialCount.value = initialData.count;
+              repeatInitialWeight.value = initialData.weight;
+          } else {
+              repeatInitialCount.value = null;
+              repeatInitialWeight.value = null;
+          }
           isModalOpen.value = true;
+        };
+
+        const repeatRecord = (record) => {
+            // Find action
+            let action = allActions.value.find(a => a.label === record.actionType || a.name === record.actionType);
+            if (!action) return;
+
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            openModal(action, { 
+                count: record.count, 
+                weight: record.weight // Will be undefined for old records, falling back to localStorage logic in Modal
+            });
+            
+            // Reset swipe
+            swipeActiveId.value = null;
+            swipeOffset.value = 0;
         };
 
         const closeModal = () => {
@@ -2183,12 +2244,13 @@
                  const kcal = newRecord.calories || estimatedKcal || 0;
                  
                  const localRecord = {
-                     id: newRecord.id,
-                     date: createdMs,
-                     actionType: actionDef ? actionDef.label : actionName,
-                     count: newRecord.count,
-                     kcal: kcal
-                 };
+                    id: newRecord.id,
+                    date: createdMs,
+                    actionType: actionDef ? actionDef.label : actionName,
+                    count: newRecord.count,
+                    kcal: kcal,
+                    weight: parseInt(weightLifted) || 0
+                };
                  
                  history.value.unshift(localRecord);
                  if (allHistory.value.length > 0) {
