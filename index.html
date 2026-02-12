@@ -631,48 +631,50 @@
                         <button @click="fetchPumpData" class="btn btn-primary btn-sm">重试</button>
                     </div>
 
-                    <div 
-                        v-else
-                        class="absolute w-full h-full p-4"
-                        :style="cardStyle"
-                        @touchstart="onCardTouchStart"
-                        @touchmove="onCardTouchMove"
-                        @touchend="onCardTouchEnd"
-                        @mousedown="onCardTouchStart"
-                        @mousemove="onCardTouchMove"
-                        @mouseup="onCardTouchEnd"
-                        @mouseleave="onCardTouchEnd"
-                    >
-                        <!-- Card -->
-                        <div class="w-full h-full bg-white rounded-[2rem] shadow-2xl border border-base-200 flex flex-col overflow-hidden relative select-none cursor-grab active:cursor-grabbing">
-                            <!-- Cover Image -->
-                            <div v-if="currentCard.cover" class="h-1/2 w-full bg-gray-100 overflow-hidden relative">
-                                <img :src="currentCard.cover" class="w-full h-full object-cover pointer-events-none" alt="Cover">
-                                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                                <div class="absolute bottom-4 left-4 right-4">
-                                     <span class="inline-block px-3 py-1 bg-primary/90 text-primary-content text-xs font-bold rounded-full backdrop-blur-sm mb-1">
-                                        {{ currentCard.category }}
-                                     </span>
+                    <div v-else class="relative w-full h-full">
+                        <div 
+                            v-for="(card, index) in visibleCards"
+                            :key="card.id"
+                            class="absolute inset-0 p-4"
+                            :style="{ ...card.style, zIndex: card.zIndex }"
+                            @touchstart="card.isCurrent ? onCardTouchStart($event) : null"
+                            @touchmove="card.isCurrent ? onCardTouchMove($event) : null"
+                            @touchend="card.isCurrent ? onCardTouchEnd($event) : null"
+                            @mousedown="card.isCurrent ? onCardTouchStart($event) : null"
+                            @mousemove="card.isCurrent ? onCardTouchMove($event) : null"
+                            @mouseup="card.isCurrent ? onCardTouchEnd($event) : null"
+                            @mouseleave="card.isCurrent ? onCardTouchEnd($event) : null"
+                        >
+                            <div class="w-full h-full bg-white rounded-[2rem] shadow-2xl border border-base-200 flex flex-col overflow-hidden relative select-none cursor-grab active:cursor-grabbing">
+                                <!-- Cover Image -->
+                                <div v-if="card.cover" class="h-1/2 w-full bg-gray-100 overflow-hidden relative">
+                                    <img :src="card.cover" class="w-full h-full object-cover pointer-events-none" alt="Cover">
+                                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                                    <div class="absolute bottom-4 left-4 right-4">
+                                         <span class="inline-block px-3 py-1 bg-primary/90 text-primary-content text-xs font-bold rounded-full backdrop-blur-sm mb-1">
+                                            {{ card.category }}
+                                         </span>
+                                    </div>
                                 </div>
-                            </div>
-                            <!-- No Cover State -->
-                            <div v-else class="h-1/3 w-full bg-gradient-to-br from-base-200 to-base-100 flex items-center justify-center relative">
-                                <div class="absolute bottom-4 left-4">
-                                     <span class="inline-block px-3 py-1 bg-base-300 text-base-content/60 text-xs font-bold rounded-full mb-1">
-                                        {{ currentCard.category }}
-                                     </span>
+                                <!-- No Cover State -->
+                                <div v-else class="h-1/3 w-full bg-gradient-to-br from-base-200 to-base-100 flex items-center justify-center relative">
+                                    <div class="absolute bottom-4 left-4">
+                                         <span class="inline-block px-3 py-1 bg-base-300 text-base-content/60 text-xs font-bold rounded-full mb-1">
+                                            {{ card.category }}
+                                         </span>
+                                    </div>
                                 </div>
-                            </div>
-
-                            <!-- Content -->
-                            <div class="flex-1 p-8 flex flex-col justify-center text-center relative">
-                                <h3 
-                                    class="font-normal text-base-content mb-6 leading-tight"
-                                    :class="titleClass"
-                                >
-                                    {{ currentCard.title }}
-                                </h3>
-                                <p class="text-base-content/60 font-medium leading-relaxed text-lg line-clamp-4">{{ currentCard.content }}</p>
+    
+                                <!-- Content -->
+                                <div class="flex-1 p-8 flex flex-col justify-center text-center relative">
+                                    <h3 
+                                        class="font-normal text-base-content mb-6 leading-tight"
+                                        :class="getTitleClass(card.title)"
+                                    >
+                                        {{ card.title }}
+                                    </h3>
+                                    <p class="text-base-content/60 font-medium leading-relaxed text-lg line-clamp-4">{{ card.content }}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -807,7 +809,7 @@
           <div class="w-12 h-1.5 bg-base-300 rounded-full mx-auto mb-6 opacity-50"></div>
           
           <div class="text-center mb-8">
-             <h3 class="text-2xl font-black text-base-content mb-1">{{ title }}</h3>
+             <h3 class="text-2xl font-black text-base-content mb-1">{{ title || (action ? action.label : '') }}</h3>
              <p v-if="description" class="text-sm text-base-content/60 font-medium mb-2 px-8 leading-relaxed">{{ description }}</p>
              <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wide mt-1">
                 <span>🔥</span>
@@ -1342,7 +1344,7 @@
         const actionsLoading = ref(false);
 
         // --- Preference Logic ---
-        const categories = ['背', '胸', '肩', '腿', '核心', '手臂'];
+        const categories = ['背', '胸', '肩', '臀腿', '核心', '手臂'];
         const activeCategory = ref('背');
         const preferredActions = ref([]); // List of action IDs
         const isPreferenceModalOpen = ref(false);
@@ -1500,6 +1502,7 @@
             // 4. Fetch Data
             await fetchActions();
             await fetchHistory('today');
+            fetchHistory('all');
         });
 
         const getCategoryMatch = (action, category) => {
@@ -1651,10 +1654,9 @@
         // Cleaned up duplicate onMounted
 
         const fetchHistory = async (range = 'today') => {
-            const config = authStore.userConfig?.configuration;
             const userId = authStore.userConfig?.userId;
             
-            if (!config || !userId) {
+            if (!userId) {
                 initLoading.value = false;
                 return;
             }
@@ -1663,12 +1665,13 @@
 
             try {
                 historyError.value = '';
-                const response = await axios.post('/api/get-history', {
-                    userId: userId,
-                    appToken: config.fs_app_token,
-                    tableId: config.fs_table_id,
-                    range: range
-                });
+                let response;
+                
+                if (range === 'today') {
+                    response = await axios.post('/api/get-today-records', { userId });
+                } else {
+                    response = await axios.post('/api/get-history', { userId, range });
+                }
 
                 if (response.data.success) {
                     const mappedData = response.data.data.map(item => {
@@ -1698,22 +1701,26 @@
                     });
 
                     if (range === 'today') {
+                        history.value = mappedData;
+                        // Pre-fill allHistory with today's data so charts show something immediately
+                        if (allHistory.value.length === 0) {
+                            allHistory.value = mappedData;
+                        }
+                    } else {
+                        allHistory.value = mappedData;
+                        // Update history (today's list) to ensure consistency with full dataset
                         const todayStr = new Date().toDateString();
                         history.value = mappedData.filter(item => {
                             const d = new Date(item.date);
                             return d.toDateString() === todayStr;
                         });
-                        // Since API returns all data, we can also populate allHistory to avoid re-fetch
-                        allHistory.value = mappedData;
-                    } else {
-                        allHistory.value = mappedData;
                     }
                 }
             } catch (error) {
                 console.error('Failed to fetch history:', error);
                 historyError.value = error.message || '获取数据失败';
             } finally {
-                initLoading.value = false;
+                if (range === 'today') initLoading.value = false;
                 if (range === 'all') historyLoading.value = false;
             }
         };
@@ -1761,10 +1768,9 @@
             }
         };
 
-        const currentCard = computed(() => {
-            if (pumpData.value.length === 0) return {};
-            return pumpData.value[currentCardIndex.value] || {};
-        });
+        // Card Swipe Handlers
+        let startX = 0;
+        let startY = 0;
 
         const cardStyle = computed(() => {
             if (isResetting.value) return { transform: 'none', transition: 'none' };
@@ -1777,20 +1783,94 @@
             };
         });
 
-        const titleClass = computed(() => {
-            const title = currentCard.value.title || '';
-            const len = title.length;
+        // Computed: Visible Cards Stack
+        const visibleCards = computed(() => {
+            const cards = [];
+            const total = pumpData.value.length;
+            if (total === 0) return [];
             
+            // Indices
+            const currentIndex = currentCardIndex.value;
+            const nextIndex = (currentIndex + 1) % total;
+            const nextNextIndex = (currentIndex + 2) % total;
+
+            // Common animation progress
+            let progress = 0;
+            if (isDragging.value || isAnimating.value) {
+                const threshold = window.innerWidth / 3;
+                progress = Math.min(Math.abs(cardX.value) / threshold, 1);
+            }
+            // Ease out effect
+            const ease = 1 - Math.pow(1 - progress, 3);
+            
+            // 1. Current Card (Foreground)
+            const current = pumpData.value[currentIndex];
+            if (current) {
+                cards.push({
+                    ...current,
+                    zIndex: 30,
+                    isCurrent: true,
+                    style: cardStyle.value
+                });
+            }
+            
+            // 2. Next Card (Background 1)
+            if (total > 1) {
+                const next = pumpData.value[nextIndex];
+                // Interpolate: Scale 0.95 -> 1.0, Opacity 0.8 -> 1.0 (optional, but keep 1 for full view? No, background is usually dimmer/smaller)
+                // Actually when becoming current, it should reach scale 1.0 and opacity 1.0
+                
+                const scale = 0.95 + (0.05 * ease);
+                const opacity = 0.8 + (0.2 * ease); // 0.8 -> 1.0
+
+                cards.push({
+                    ...next,
+                    zIndex: 20,
+                    isCurrent: false,
+                    style: {
+                        transform: `scale(${scale})`,
+                        opacity: opacity,
+                        transition: isDragging.value ? 'none' : 'all 0.3s ease-out'
+                    }
+                });
+            }
+
+            // 3. Next Next Card (Background 2 - Appearing)
+            if (total > 2) {
+                const nextNext = pumpData.value[nextNextIndex];
+                // Interpolate: Scale 0.9 -> 0.95, Opacity 0 -> 0.8
+                const scale = 0.9 + (0.05 * ease);
+                const opacity = 0.0 + (0.8 * ease); // Fade in from 0
+
+                cards.push({
+                    ...nextNext,
+                    zIndex: 10,
+                    isCurrent: false,
+                    style: {
+                        transform: `scale(${scale})`,
+                        opacity: opacity,
+                        transition: isDragging.value ? 'none' : 'all 0.3s ease-out'
+                    }
+                });
+            }
+            
+            return cards;
+        });
+
+        const getTitleClass = (title) => {
+            if (!title) return 'text-xl';
+            const len = title.length;
             if (len <= 4) return 'text-5xl';
             if (len <= 8) return 'text-4xl';
             if (len <= 15) return 'text-3xl';
             if (len <= 25) return 'text-2xl';
             return 'text-xl';
-        });
+        };
 
-        // Card Swipe Handlers
-        let startX = 0;
-        let startY = 0;
+        const currentCard = computed(() => {
+            if (pumpData.value.length === 0) return {};
+            return pumpData.value[currentCardIndex.value] || {};
+        });
 
         const onCardTouchStart = (e) => {
             if (isAnimating.value) return;
@@ -2434,12 +2514,14 @@
           pumpData,
           currentCard,
           cardStyle,
+          visibleCards, // Add visibleCards to return
+          getTitleClass, // Add getTitleClass to return
           pumpLoading,
           onCardTouchStart,
           onCardTouchMove,
           onCardTouchEnd,
           fetchPumpData,
-          titleClass,
+          // titleClass, // Removed as we use getTitleClass now
           // HW Modal
           isHWModalOpen,
           hwLoading,
