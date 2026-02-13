@@ -15,16 +15,16 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   
   <!-- Tailwind & DaisyUI -->
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="./lib/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="./lib/tailwindcss.js"></script>
   
   <!-- Vue 3 (Production) -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/vue-demi"></script>
-  <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+  <script src="./lib/vue.global.prod.js"></script>
+  <script src="./lib/vue-demi.js"></script>
+  <script src="./lib/vue-router.global.prod.js"></script>    
+  <script src="./lib/axios.min.js"></script>
   <!-- Pinia -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pinia/2.1.7/pinia.iife.min.js"></script>
+  <script src="./lib/pinia.iife.min.js"></script>
 
   <!-- Vercel Analytics -->
   <script type="module">
@@ -794,6 +794,13 @@
             :loading="hwLoading"
             @save="saveUserInfo"
         ></height-weight-modal>
+
+        <delete-confirmation-modal
+            :is-open="isDeleteModalOpen"
+            :loading="deleteLoading"
+            @close="isDeleteModalOpen = false"
+            @confirm="confirmDelete"
+        ></delete-confirmation-modal>
     </div>
   </script>
 
@@ -957,6 +964,42 @@
                     @click="stop"
                 >
                     开始下一组
+                </button>
+            </div>
+        </div>
+    </div>
+  </script>
+
+  <!-- TEMPLATE: Delete Confirmation Modal -->
+  <script type="text/x-template" id="delete-modal-template">
+    <div v-if="isOpen" class="fixed inset-0 z-[80] flex items-center justify-center p-6">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="!loading && close()"></div>
+        
+        <!-- Content -->
+        <div class="relative w-full max-w-sm bg-base-100 rounded-[2rem] p-6 shadow-2xl transform transition-all animate-slide-up text-center">
+            <div class="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🗑️
+            </div>
+            
+            <h3 class="text-xl font-black text-base-content mb-2">确认删除?</h3>
+            <p class="text-base-content/60 font-medium mb-8 text-sm">这条记录将被永久删除，无法恢复。</p>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <button 
+                    class="btn btn-ghost btn-lg rounded-2xl font-bold text-base-content/60 hover:bg-base-200"
+                    @click="close"
+                    :disabled="loading"
+                >
+                    取消
+                </button>
+                <button 
+                    class="btn btn-error btn-lg rounded-2xl font-bold shadow-xl shadow-error/20 text-white"
+                    @click="confirm"
+                    :disabled="loading"
+                >
+                    <span v-if="loading" class="loading loading-spinner"></span>
+                    <span v-else>删除</span>
                 </button>
             </div>
         </div>
@@ -1270,6 +1313,18 @@
       }
     });
 
+    // DeleteConfirmationModal
+    const DeleteConfirmationModal = defineComponent({
+      template: '#delete-modal-template',
+      props: ['isOpen', 'loading'],
+      emits: ['close', 'confirm'],
+      setup(props, { emit }) {
+        const close = () => emit('close');
+        const confirm = () => emit('confirm');
+        return { close, confirm };
+      }
+    });
+
     // Login
     const Login = defineComponent({
       template: '#login-template',
@@ -1313,7 +1368,7 @@
     // Dashboard
     const Dashboard = defineComponent({
       template: '#dashboard-template',
-      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal, HeightWeightModal },
+      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal, HeightWeightModal, DeleteConfirmationModal },
       setup() {
         const router = useRouter();
         const authStore = useAuthStore();
@@ -1328,6 +1383,11 @@
         const loading = ref(false);
         const initLoading = ref(true);
         const deletingId = ref(null);
+        
+        // Delete Modal State
+        const isDeleteModalOpen = ref(false);
+        const recordToDeleteId = ref(null);
+        const deleteLoading = ref(false);
         
         // Pump Data
         const pumpData = ref([]);
@@ -2436,10 +2496,18 @@
             }
         };
 
-        const deleteRecord = async (id) => {
-          if (confirm('确认删除这条记录吗？')) {
-            deletingId.value = id;
-            try {
+        const deleteRecord = (id) => {
+             recordToDeleteId.value = id;
+             isDeleteModalOpen.value = true;
+        };
+
+        const confirmDelete = async () => {
+             if (!recordToDeleteId.value) return;
+             
+             deleteLoading.value = true;
+             const id = recordToDeleteId.value;
+             
+             try {
                 const config = authStore.userConfig?.configuration;
                 const userId = authStore.userConfig?.userId;
                 
@@ -2453,6 +2521,13 @@
                     
                     // Remove from local list after successful backend deletion
                     history.value = history.value.filter(item => item.id !== id);
+                    if (allHistory.value && allHistory.value.length > 0) {
+                        allHistory.value = allHistory.value.filter(item => item.id !== id);
+                    }
+                    
+                    // Close modal
+                    isDeleteModalOpen.value = false;
+                    recordToDeleteId.value = null;
                 } else {
                     alert("配置缺失，无法删除云端记录。");
                 }
@@ -2460,9 +2535,8 @@
                 console.error("Failed to delete record:", error);
                 alert("删除云端记录失败。");
             } finally {
-                deletingId.value = null;
+                deleteLoading.value = false;
             }
-          }
         };
 
         // Duplicate handleRepeat removed
@@ -2522,6 +2596,9 @@
           closeModal, 
           handleConfirm, 
           deleteRecord, 
+          confirmDelete,
+          isDeleteModalOpen,
+          deleteLoading,
           logout,
           getIcon, 
           getActionColor, 

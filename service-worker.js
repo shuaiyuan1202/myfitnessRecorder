@@ -1,14 +1,18 @@
 // Service Worker for FitTrack
-const CACHE_NAME = 'fittrack-v1';
+const CACHE_NAME = 'fittrack-v2';
 const urlsToCache = [
   './',
   './index.html',
-  'https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/vue@3/dist/vue.global.prod.js',
-  'https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pinia/2.1.7/pinia.iife.min.js'
+  './manifest.json',
+  './icon.svg',
+  './lib/full.min.css',
+  './lib/tailwindcss.js',
+  './lib/vue.global.prod.js',
+  './lib/vue-demi.js',
+  './lib/vue-router.global.prod.js',
+  './lib/axios.min.js',
+  './lib/pinia.iife.min.js',
+  './resources/finish.mp3'
 ];
 
 self.addEventListener('install', event => {
@@ -25,7 +29,8 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Cache hit - return response
+        // Cache First Strategy
+        // If it's in the cache, return it immediately.
         if (response) {
           return response;
         }
