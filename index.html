@@ -977,7 +977,7 @@
       });
     }
 
-    const { createApp, ref, computed, watch, onMounted, onUnmounted, defineComponent, toRef } = Vue; // Added toRef
+    const { createApp, ref, computed, watch, onMounted, onUnmounted, defineComponent, toRef, nextTick } = Vue; // Added nextTick
     const { createRouter, createWebHashHistory, useRouter } = VueRouter;
     const { defineStore, createPinia } = Pinia;
 
@@ -1032,28 +1032,32 @@
              return props.action && props.action.calc_mode && props.action.calc_mode.toLowerCase() === 'weighted';
         });
 
+        const updateFromProps = () => {
+             // Count Logic
+             if (props.initialCount !== undefined && props.initialCount !== null) {
+                 count.value = parseInt(props.initialCount);
+             } else {
+                 count.value = 10;
+             }
+
+             // Weight Logic
+             if (props.action) {
+                 if (props.initialWeight !== undefined && props.initialWeight !== null) {
+                     weightLifted.value = parseInt(props.initialWeight);
+                 } else {
+                     const savedWeight = localStorage.getItem(`weight_lifted_${props.action.id}`);
+                     if (savedWeight) {
+                         weightLifted.value = parseInt(savedWeight);
+                     } else {
+                         weightLifted.value = 10;
+                     }
+                 }
+             }
+        };
+
         watch(() => props.isOpen, (newVal) => {
           if (newVal) {
-            // Count Logic: Priority: initialCount prop > 10
-            if (props.initialCount) {
-                count.value = parseInt(props.initialCount);
-            } else {
-                count.value = 10;
-            }
-
-            // Weight Logic: Priority: initialWeight prop > localStorage > 10
-            if (props.action) {
-                if (props.initialWeight) {
-                    weightLifted.value = parseInt(props.initialWeight);
-                } else {
-                    const savedWeight = localStorage.getItem(`weight_lifted_${props.action.id}`);
-                    if (savedWeight) {
-                        weightLifted.value = parseInt(savedWeight);
-                    } else {
-                        weightLifted.value = 10;
-                    }
-                }
-            }
+            nextTick(updateFromProps);
           }
         });
 
@@ -1387,9 +1391,12 @@
         const swipeOffset = ref(0);
         const isSwipeDragging = ref(false);
         const swipeStartX = ref(0);
+        const swipeStartY = ref(0); // New for scroll detection
+        const isScrollLocked = ref(false); // New
 
         const onSwipeStart = (e, id) => {
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
             if (swipeActiveId.value && swipeActiveId.value !== id) {
                 swipeActiveId.value = null;
@@ -1398,35 +1405,68 @@
 
             if (swipeActiveId.value === id) {
                 swipeStartX.value = clientX - swipeOffset.value;
+                swipeStartY.value = clientY;
             } else {
                 swipeActiveId.value = id;
                 swipeStartX.value = clientX;
+                swipeStartY.value = clientY;
                 swipeOffset.value = 0;
             }
             isSwipeDragging.value = true;
+            isScrollLocked.value = false; // Reset lock
         };
 
         const onSwipeMove = (e) => {
-            if (!isSwipeDragging.value || !swipeActiveId.value) return;
+            if (!isSwipeDragging.value || !swipeActiveId.value || isScrollLocked.value) return;
             
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const diff = clientX - swipeStartX.value;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             
-            // Allow swiping right (up to 80px) and left (up to -80px)
-            if (diff < -80) swipeOffset.value = -80;
-            else if (diff > 80) swipeOffset.value = 80;
-            else swipeOffset.value = diff;
+            const diffX = clientX - swipeStartX.value;
+            const diffY = clientY - swipeStartY.value;
+            
+            // Direction Check: if vertical move is dominant, cancel swipe
+            if (!isScrollLocked.value) {
+                // If moved enough to check direction
+                if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
+                    if (Math.abs(diffY) > Math.abs(diffX)) {
+                        isScrollLocked.value = true;
+                        isSwipeDragging.value = false;
+                        swipeActiveId.value = null;
+                        swipeOffset.value = 0;
+                        return;
+                    }
+                }
+            }
+            
+            // Allow swiping right (up to 80px) and left (up to -150px to allow trigger)
+            // Left swipe: normal delete reveal at -80, trigger at -120
+            if (diffX < -150) swipeOffset.value = -150;
+            else if (diffX > 80) swipeOffset.value = 80;
+            else swipeOffset.value = diffX;
         };
 
         const onSwipeEnd = () => {
             isSwipeDragging.value = false;
             if (!swipeActiveId.value) return;
 
-            if (swipeOffset.value < -40) {
-                // Keep delete button open
+            // Deep Left Swipe (Delete)
+            if (swipeOffset.value < -120) {
+                 const id = swipeActiveId.value;
+                 // Reset swipe first
+                 swipeOffset.value = 0;
+                 swipeActiveId.value = null;
+                 
+                 // Trigger delete confirmation
+                 if (navigator.vibrate) navigator.vibrate(50);
+                 deleteRecord(id);
+            } 
+            // Normal Left Swipe (Reveal Delete Button)
+            else if (swipeOffset.value < -40) {
                 swipeOffset.value = -80; 
-            } else if (swipeOffset.value > 40) {
-                // Trigger repeat action immediately
+            } 
+            // Right Swipe (Repeat)
+            else if (swipeOffset.value > 40) {
                 const record = history.value.find(r => r.id === swipeActiveId.value);
                 if (record) {
                     repeatRecord(record);
@@ -2528,6 +2568,8 @@
           saveUserInfo,
           // Stats
           getTodaySetsForAction,
+          repeatInitialCount,
+          repeatInitialWeight,
           // Swipe Logic
           swipeActiveId,
           swipeOffset,
