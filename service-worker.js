@@ -1,5 +1,5 @@
 // Service Worker for FitTrack
-const CACHE_NAME = 'fittrack-v2';
+const CACHE_NAME = 'fittrack-v4';
 const urlsToCache = [
   './',
   './index.html',

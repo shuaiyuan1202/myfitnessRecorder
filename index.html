@@ -29,7 +29,10 @@
   <!-- Vercel Analytics -->
   <script type="module">
     import { inject } from 'https://cdn.jsdelivr.net/npm/@vercel/analytics/+esm';
-    inject();
+    // Only run on production domains to avoid 404 errors locally
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      inject();
+    }
   </script>
   <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
@@ -405,8 +408,9 @@
                    </div>
                 </header>
             
-                <!-- Quick Actions -->
-                <div class="px-6 mb-8">
+                <!-- Sticky Header Group: Quick Actions + Today Title -->
+                <div class="sticky top-0 z-30 bg-base-200/95 backdrop-blur-md px-6 pt-2 pb-2 -mx-0 transition-all shadow-sm rounded-b-3xl">
+                   <!-- Quick Actions Header -->
                    <div class="flex items-center justify-between mb-4">
                      <h3 class="font-bold text-lg text-base-content/90">快速记录</h3>
                      <button @click="fetchActions(true)" class="btn btn-ghost btn-xs text-primary" :class="{'loading': actionsLoading}">
@@ -431,7 +435,7 @@
                        <span class="loading loading-spinner text-primary"></span>
                    </div>
 
-                   <div v-else class="grid grid-cols-4 gap-3">
+                   <div v-else class="grid grid-cols-4 gap-3 mb-6">
                       <button 
                          v-for="action in filteredPreferredActions" 
                          :key="action.id"
@@ -464,11 +468,13 @@
                           <div class="text-[10px] font-bold">添加</div>
                       </button>
                    </div>
+
+                   <!-- Today Title (Moved inside sticky) -->
+                   <h3 class="font-bold text-lg text-base-content/90 mb-2 pl-1">今日记录</h3>
                 </div>
 
                 <!-- Today's List -->
-                <div class="px-6 pb-20">
-                   <h3 class="font-bold text-lg text-base-content/90 mb-4">今日记录</h3>
+                <div class="px-6 pb-20 pt-4">
                    <div class="relative border-l-2 border-base-300 space-y-8">
                       <!-- Loading Skeleton -->
                       <div v-if="initLoading" class="pl-6 space-y-4">
@@ -582,6 +588,7 @@
                             <div class="w-3 h-3 rounded-[2px] bg-green-200"></div>
                             <div class="w-3 h-3 rounded-[2px] bg-green-400"></div>
                             <div class="w-3 h-3 rounded-[2px] bg-green-600"></div>
+                            <div class="w-3 h-3 rounded-[2px] bg-green-800"></div>
                             <span>多</span>
                         </div>
                     </div>
@@ -2078,8 +2085,9 @@
                  const count = activityMap[dateStr] || 0;
                  let color = 'bg-base-200'; // default gray
                  if (count > 0) color = 'bg-green-200';
-                 if (count > 2) color = 'bg-green-400';
-                 if (count > 5) color = 'bg-green-600';
+                 if (count >= 8) color = 'bg-green-400';
+                 if (count >= 16) color = 'bg-green-600';
+                 if (count >= 25) color = 'bg-green-800';
                  
                  days.push({
                      date: d.toLocaleDateString(),
@@ -2638,7 +2646,6 @@
           onCardTouchMove,
           onCardTouchEnd,
           fetchPumpData,
-          // titleClass, // Removed as we use getTitleClass now
           // HW Modal
           isHWModalOpen,
           hwLoading,
