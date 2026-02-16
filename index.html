@@ -611,14 +611,35 @@
 
                     <!-- Radar Chart -->
                     <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 mb-6 relative">
-                        <div class="flex items-center gap-3 mb-1">
-                            <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🕸️</div>
-                            <h4 class="font-bold text-base-content/80">训练健康度雷达</h4>
-                            <button @click="showRadarInfo = true" class="btn btn-ghost btn-xs btn-circle text-base-content/40 hover:text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                                </svg>
-                            </button>
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🕸️</div>
+                                <h4 class="font-bold text-base-content/80">训练健康度雷达</h4>
+                                <button @click="showRadarInfo = true" class="btn btn-ghost btn-xs btn-circle text-base-content/40 hover:text-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="flex flex-col items-end gap-1">
+                                <button 
+                                    class="btn btn-xs rounded-full px-3 border border-primary/40 bg-primary/5 text-xs flex items-center gap-1 transition-colors"
+                                    :class="radarIsPlaying ? 'text-primary bg-primary/10' : 'text-base-content/70 hover:bg-primary/10 hover:text-primary'"
+                                    :disabled="radarPlaybackSnapshots.length === 0"
+                                    @click="toggleRadarPlayback"
+                                >
+                                    <span v-if="!radarIsPlaying">▶</span>
+                                    <span v-else>⏸</span>
+                                    <span v-if="!radarIsPlaying">历史趋势播放</span>
+                                    <span v-else>停止播放</span>
+                                </button>
+                                <span 
+                                    v-if="radarPlaybackLabel" 
+                                    class="text-[10px] text-base-content/50"
+                                >
+                                    {{ radarPlaybackLabel }}
+                                </span>
+                            </div>
                         </div>
                         <p class="text-xs text-base-content/40 ml-11 mb-4">基于多周期数据综合计算</p>
                         <div ref="radarContainer" class="w-full h-80"></div>
@@ -2126,9 +2147,14 @@
         // --- Radar Chart Logic ---
         const radarContainer = ref(null);
         let radarChart = null;
+        const radarPlaybackSnapshots = ref([]);
+        const radarIsPlaying = ref(false);
+        const radarPlaybackIndex = ref(0);
+        const radarPlaybackLabel = ref('');
+        let radarPlaybackTimer = null;
 
-        const scoreData = computed(() => {
-            if (allHistory.value.length === 0) return null;
+        const computeScoresForDate = (targetDate, records) => {
+            if (!records || records.length === 0) return null;
 
             const scores = {
                 '胸': { vol: 0, int: 0, con: 0, bal: 0 },
@@ -2141,25 +2167,25 @@
 
             const muscleGroups = Object.keys(scores);
             const userWeight = authStore.userConfig?.weight || 70;
-            const now = new Date();
+            const now = targetDate;
             const oneDay = 24 * 60 * 60 * 1000;
             const sevenDaysAgo = new Date(now.getTime() - 7 * oneDay);
             const twentyOneDaysAgo = new Date(now.getTime() - 21 * oneDay);
             const twentyEightDaysAgo = new Date(now.getTime() - 28 * oneDay);
             const fortyFiveDaysAgo = new Date(now.getTime() - 45 * oneDay);
 
-            // Helper: Group history by muscle
             const historyByMuscle = {};
             muscleGroups.forEach(m => historyByMuscle[m] = []);
 
-            // Helper: Global Stats for Balance (Last 21 Days)
             const balanceStats = { push: 0, pull: 0, squat: 0, hinge: 0 };
 
-            allHistory.value.forEach(record => {
+            records.forEach(record => {
+                const recordDate = new Date(record.date);
+                if (recordDate > now) return;
+
                 const action = allActions.value.find(a => a.label === record.actionType || a.name === record.actionType);
                 if (!action) return;
                 
-                // Map muscle group
                 let muscle = '其他';
                 const target = action.target_muscle_group || '';
                 if (target.includes('胸')) muscle = '胸';
@@ -2173,12 +2199,9 @@
                     historyByMuscle[muscle].push(record);
                 }
 
-                // Balance Stats (Last 21 days)
-                const recordDate = new Date(record.date);
                 if (recordDate >= twentyOneDaysAgo) {
                      let type = record.mechanic_type || action.mechanic_type;
                      if (!type) {
-                         // Fallback Inference
                          if (muscle === '胸' || muscle === '肩' || (muscle === '臂' && action.name.toLowerCase().includes('tricep'))) type = 'push';
                          else if (muscle === '背' || (muscle === '臂' && action.name.toLowerCase().includes('bicep'))) type = 'pull';
                          else if (muscle === '腿') {
@@ -2194,11 +2217,9 @@
                 }
             });
 
-            // Calculate Scores per Muscle
             muscleGroups.forEach(muscle => {
                 const logs = historyByMuscle[muscle];
                 
-                // 1. Volume (Last 7 Days)
                 const last7DaysLogs = logs.filter(r => new Date(r.date) >= sevenDaysAgo);
                 const S = last7DaysLogs.length; 
                 let scoreVol = 0;
@@ -2208,7 +2229,6 @@
                 else scoreVol = 100 - (S - 20) * 2;
                 scores[muscle].vol = Math.max(0, Math.min(100, scoreVol));
 
-                // 2. Intensity (Max Weight Ratio) - Last 45 Days
                 const last45DaysLogs = logs.filter(r => new Date(r.date) >= fortyFiveDaysAgo);
                 let max1RM = 0;
                 last45DaysLogs.forEach(r => {
@@ -2232,7 +2252,6 @@
                     scores[muscle].int = scoreInt;
                 }
 
-                // 3. Consistency (Days since last) - Last 28 Days Check
                 const last28DaysLogs = logs.filter(r => new Date(r.date) >= twentyEightDaysAgo);
                 if (last28DaysLogs.length > 0) {
                     last28DaysLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -2243,15 +2262,14 @@
                     if (daysGap <= 3) scoreCon = 100;
                     else if (daysGap <= 5) scoreCon = 85;
                     else if (daysGap <= 7) scoreCon = 60;
-                    else if (daysGap <= 14) scoreCon = 40; // 7-14 days: 40
-                    else if (daysGap <= 21) scoreCon = 20; // 14-21 days: 20
-                    else scoreCon = 10; // 21-28 days: 10
+                    else if (daysGap <= 14) scoreCon = 40;
+                    else if (daysGap <= 21) scoreCon = 20;
+                    else scoreCon = 10;
                     scores[muscle].con = scoreCon;
                 } else {
                     scores[muscle].con = 0;
                 }
 
-                // 4. Balance
                 let scoreBal = 100;
                 if (muscle === '胸' || muscle === '肩' || muscle === '背' || muscle === '臂') {
                     const num = Math.min(balanceStats.push, balanceStats.pull);
@@ -2267,14 +2285,61 @@
 
             return muscleGroups.map(m => {
                 const s = scores[m];
-                // Only count non-zero components? Or straight average? 
-                // Usually straight average encourages roundedness.
-                // However, if Intensity is 0 (bodyweight only), it punishes score.
-                // Let's stick to straight average as per typical game charts.
                 const total = s.vol + s.int + s.con + s.bal;
                 return Math.round(total / 4);
             });
+        };
+
+        const scoreData = computed(() => {
+            if (allHistory.value.length === 0) return null;
+            const now = new Date();
+            return computeScoresForDate(now, allHistory.value);
         });
+
+        const buildRadarSnapshots = () => {
+            radarPlaybackSnapshots.value = [];
+            radarPlaybackIndex.value = 0;
+            radarPlaybackLabel.value = '';
+
+            if (allHistory.value.length === 0) return;
+
+            let minDate = null;
+            let maxDate = null;
+            allHistory.value.forEach(record => {
+                const d = new Date(record.date);
+                if (!minDate || d < minDate) minDate = d;
+                if (!maxDate || d > maxDate) maxDate = d;
+            });
+
+            if (!minDate || !maxDate) return;
+
+            const twoMonthsAgo = new Date(maxDate.getTime());
+            twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+            const startDate = minDate > twoMonthsAgo ? minDate : twoMonthsAgo;
+
+            const current = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
+
+            const muscleOrder = ['胸', '背', '腿', '肩', '臂', '核心'];
+
+            while (current <= end) {
+                const snapshotDate = new Date(current.getTime());
+                const scores = computeScoresForDate(snapshotDate, allHistory.value);
+                if (scores) {
+                    radarPlaybackSnapshots.value.push({
+                        date: snapshotDate,
+                        scores: scores
+                    });
+                }
+                current.setDate(current.getDate() + 1);
+            }
+
+            if (radarPlaybackSnapshots.value.length > 0) {
+                const first = radarPlaybackSnapshots.value[0].date;
+                const last = radarPlaybackSnapshots.value[radarPlaybackSnapshots.value.length - 1].date;
+                radarPlaybackLabel.value = first.toLocaleDateString() + ' ~ ' + last.toLocaleDateString();
+            }
+        };
 
         const initRadarChart = () => {
              if (!radarContainer.value || !scoreData.value) return;
@@ -2282,6 +2347,9 @@
              
              radarChart = echarts.init(radarContainer.value);
              const option = {
+                 animationDuration: 0,
+                 animationDurationUpdate: 100,
+                 animationEasingUpdate: 'linear',
                  color: ['#6366f1'],
                  radar: {
                      indicator: [
@@ -2334,21 +2402,100 @@
              };
              radarChart.setOption(option);
              
-             // Resize handler
              window.addEventListener('resize', () => {
                  radarChart && radarChart.resize();
              });
         };
 
+        const updateRadarChart = (values) => {
+            if (!radarChart || !values) return;
+            radarChart.setOption({
+                series: [{
+                    data: [{
+                        value: values,
+                        name: '训练评分',
+                        areaStyle: {
+                            color: 'rgba(99, 102, 241, 0.5)'
+                        },
+                        lineStyle: {
+                            width: 3
+                        },
+                        symbol: 'circle',
+                        symbolSize: 6
+                    }]
+                }]
+            });
+        };
+
+        const stopRadarPlayback = () => {
+            radarIsPlaying.value = false;
+            if (radarPlaybackTimer) {
+                clearInterval(radarPlaybackTimer);
+                radarPlaybackTimer = null;
+            }
+        };
+
+        const startRadarPlayback = () => {
+            if (!radarChart || radarPlaybackSnapshots.value.length === 0) return;
+            radarIsPlaying.value = true;
+            radarPlaybackIndex.value = 0;
+
+            const tick = () => {
+                if (!radarIsPlaying.value) return;
+                if (radarPlaybackSnapshots.value.length === 0) return;
+
+                const total = radarPlaybackSnapshots.value.length;
+                if (radarPlaybackIndex.value >= total) {
+                    stopRadarPlayback();
+                    return;
+                }
+
+                const frame = radarPlaybackSnapshots.value[radarPlaybackIndex.value];
+                const dateText = frame.date.toLocaleDateString();
+                radarPlaybackLabel.value = dateText;
+                updateRadarChart(frame.scores);
+
+                radarPlaybackIndex.value += 1;
+            };
+
+            tick();
+
+            radarPlaybackTimer = setInterval(() => {
+                tick();
+            }, 100);
+        };
+
+        const toggleRadarPlayback = () => {
+            if (radarIsPlaying.value) {
+                stopRadarPlayback();
+                radarPlaybackLabel.value = '';
+            } else {
+                if (radarPlaybackSnapshots.value.length === 0) {
+                    buildRadarSnapshots();
+                }
+                if (radarPlaybackSnapshots.value.length > 0) {
+                    startRadarPlayback();
+                }
+            }
+        };
+
         watch(activeTab, (val) => {
              if (val === 'history') {
-                 setTimeout(() => initRadarChart(), 100);
+                 setTimeout(() => {
+                     buildRadarSnapshots();
+                     initRadarChart();
+                 }, 100);
+             } else {
+                 stopRadarPlayback();
              }
         });
 
         watch(allHistory, () => {
              if (activeTab.value === 'history') {
-                 setTimeout(() => initRadarChart(), 100);
+                 setTimeout(() => {
+                     buildRadarSnapshots();
+                     initRadarChart();
+                 }, 100);
              }
         });
 
@@ -2630,6 +2777,10 @@
           fetchHistory,
           scoreData,
           radarContainer,
+          radarPlaybackSnapshots,
+          radarIsPlaying,
+          radarPlaybackLabel,
+          toggleRadarPlayback,
           // Preferences
           categories,
           activeCategory,
