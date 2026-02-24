@@ -543,7 +543,7 @@
                                 </div>
                                 
                                 <div class="text-right pointer-events-none">
-                                   <div class="font-black text-lg text-base-content">{{ record.count }} <span class="text-xs font-medium text-base-content/40">次</span></div>
+                                   <div class="font-black text-lg text-base-content" v-html="formatRecordDisplay(record)"></div>
                                    <div class="text-xs font-bold text-primary">
                                       <span v-if="record.mechanic_type === 'bodyweight' || record.mechanic_type === 'body_weight'">自重</span>
                                       <span v-else-if="record.weight && record.weight > 0">{{ record.weight }} kg</span>
@@ -853,12 +853,30 @@
              <p v-if="description" class="text-sm text-base-content/60 font-medium mb-2 px-8 leading-relaxed">{{ description }}</p>
              <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wide mt-1">
                 <span>🔥</span>
-                <span>{{ (estimatedKcal / count).toFixed(2) }} 千卡 / 次</span>
+                <span v-if="isDuration">{{ estimatedKcal }} 千卡</span>
+                <span v-else>{{ (estimatedKcal / count).toFixed(2) }} 千卡 / 次</span>
              </div>
           </div>
           
-          <!-- Main Counter -->
-          <div class="flex items-center justify-between gap-4 mb-6 px-4">
+          <!-- Duration Timer Mode -->
+          <div v-if="isDuration" class="flex flex-col items-center justify-center mb-8 animate-fade-in">
+              <div class="font-mono text-7xl font-black text-base-content mb-6 tabular-nums tracking-wider">
+                  {{ formattedTimer }}
+              </div>
+              <button 
+                  class="btn btn-circle btn-xl w-24 h-24 shadow-xl transition-all border-4 relative"
+                  :class="timerRunning ? 'btn-error border-error/30' : 'btn-success border-success/30'"
+                  @click="toggleTimer"
+              >
+                  <span class="text-3xl">{{ timerRunning ? '⏹' : '▶️' }}</span>
+                  <span class="absolute -bottom-8 text-xs font-bold uppercase tracking-widest text-base-content/50">
+                      {{ timerRunning ? '停止' : '开始计时' }}
+                  </span>
+              </button>
+          </div>
+
+          <!-- Standard Reps Counter -->
+          <div v-else class="flex items-center justify-between gap-4 mb-6 px-4 animate-fade-in">
               <button 
                 class="btn btn-circle btn-xl bg-base-200 hover:bg-base-300 border-none text-2xl h-16 w-16 shadow-inner active:scale-95 transition-transform"
                 @click="decrement"
@@ -884,8 +902,8 @@
               </button>
           </div>
           
-          <!-- Count Presets -->
-          <div class="flex justify-between gap-2 mb-6 overflow-x-auto pb-2 px-1 scrollbar-hide">
+          <!-- Count Presets (Hide for Duration) -->
+          <div v-if="!isDuration" class="flex justify-between gap-2 mb-6 overflow-x-auto pb-2 px-1 scrollbar-hide">
              <button 
                 v-for="preset in presets" 
                 :key="preset"
@@ -897,8 +915,8 @@
              </button>
           </div>
 
-          <!-- Weight Selector (Only for Weighted) -->
-          <div v-if="isWeighted" class="mb-8 px-4">
+          <!-- Weight Selector (Only for Weighted & Not Duration) -->
+          <div v-if="isWeighted && !isDuration" class="mb-8 px-4">
               <div class="flex items-center justify-between mb-2">
                   <span class="text-xs font-bold text-base-content/40 uppercase tracking-widest">负重 (KG)</span>
                   <span class="text-lg font-black text-base-content tabular-nums">{{ weightLifted }} <span class="text-xs">kg</span></span>
@@ -1099,6 +1117,48 @@
       setup(props, { emit }) {
         const count = ref(10);
         const presets = [10, 20, 30, 40, 50];
+
+        // Duration / Timer Logic
+        const isDuration = computed(() => {
+             return props.action && props.action.calc_mode === 'duration';
+        });
+
+        const timerRunning = ref(false);
+        const timerValue = ref(0);
+        let timerInterval = null;
+        let startTime = 0;
+
+        const formattedTimer = computed(() => {
+            const m = Math.floor(timerValue.value / 60).toString().padStart(2, '0');
+            const s = (timerValue.value % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        });
+
+        const toggleTimer = () => {
+            if (timerRunning.value) {
+                // Stop
+                timerRunning.value = false;
+                if (timerInterval) cancelAnimationFrame(timerInterval);
+                count.value = timerValue.value; 
+            } else {
+                // Start
+                if (navigator.vibrate) navigator.vibrate(50);
+                timerRunning.value = true;
+                startTime = Date.now() - (timerValue.value * 1000);
+                
+                const tick = () => {
+                    if (!timerRunning.value) return;
+                    const now = Date.now();
+                    const diff = Math.floor((now - startTime) / 1000);
+                    if (diff !== timerValue.value) {
+                        timerValue.value = diff;
+                        count.value = diff;
+                    }
+                    timerInterval = requestAnimationFrame(tick);
+                };
+                tick();
+            }
+        };
         
         // Weight Lifted Logic
         const weightLifted = ref(10); // Default 10kg
@@ -1113,7 +1173,12 @@
              if (props.initialCount !== undefined && props.initialCount !== null) {
                  count.value = parseInt(props.initialCount);
              } else {
-                 count.value = 10;
+                 count.value = isDuration.value ? 0 : 10;
+             }
+
+             // Sync timer value
+             if (isDuration.value) {
+                 timerValue.value = count.value;
              }
 
              // Weight Logic
@@ -1128,26 +1193,33 @@
                          weightLifted.value = 10;
                      }
                  }
+                 // Force 0 weight for duration mode (though input is hidden)
+                 if (isDuration.value) {
+                     weightLifted.value = 0;
+                 }
              }
         };
 
         watch(() => props.isOpen, (newVal) => {
           if (newVal) {
+            timerRunning.value = false;
+            if (timerInterval) cancelAnimationFrame(timerInterval);
             nextTick(updateFromProps);
           }
         });
 
         const estimatedKcal = computed(() => {
-          // If action has no MET/seconds_per_rep, fallback to simple kcalPerRep
-          // But if we have calc_mode='weighted', we should try to be dynamic even if some data is missing (using defaults)
-          
           const met = props.action?.met || 3.0; // Default moderate intensity
-          const seconds = props.action?.seconds_per_rep || 3.0;
           const weight = props.userWeight || 70; // Default 70kg if missing
+
+          // Duration Mode
+          if (isDuration.value) {
+             const totalKcal = met * weight * (count.value / 3600);
+             return totalKcal.toFixed(1);
+          }
           
-          // If we really lack specific action data, use the static kcalPerRep as base, 
-          // BUT if it's weighted, we must add the weight factor.
-          
+          // Standard Reps Mode
+          const seconds = props.action?.seconds_per_rep || 3.0;
           let baseKcalPerRep;
           
           if (props.action && props.action.met && props.action.seconds_per_rep) {
@@ -1202,6 +1274,12 @@
         const confirm = () => {
           if (navigator.vibrate) navigator.vibrate(50);
           
+          if (timerRunning.value) {
+               timerRunning.value = false;
+               if (timerInterval) cancelAnimationFrame(timerInterval);
+               count.value = timerValue.value;
+          }
+
           // Save weight preference
           if (isWeighted.value && props.action) {
                localStorage.setItem(`weight_lifted_${props.action.id}`, weightLifted.value);
@@ -1219,7 +1297,8 @@
         const loading = computed(() => props.loading);
 
         return { count, presets, estimatedKcal, increment, decrement, updateCount, selectPreset, confirm, close, loading, 
-                 isWeighted, weightLifted, weightPresets, selectWeightPreset };
+                 isWeighted, weightLifted, weightPresets, selectWeightPreset,
+                 isDuration, timerRunning, formattedTimer, toggleTimer };
       }
     });
 
@@ -2230,27 +2309,38 @@
                 scores[muscle].vol = Math.max(0, Math.min(100, scoreVol));
 
                 const last45DaysLogs = logs.filter(r => new Date(r.date) >= fortyFiveDaysAgo);
-                let max1RM = 0;
+                let maxScore = 0;
+                
                 last45DaysLogs.forEach(r => {
-                    const w = parseFloat(r.weight || 0);
-                    const reps = parseFloat(r.count || 0);
-                    if (w > 0 && reps > 0) {
-                        const est1RM = w * (1 + reps / 30);
-                        if (est1RM > max1RM) max1RM = est1RM;
+                    const action = allActions.value.find(a => a.label === r.actionType || a.name === r.actionType);
+                    let currentScore = 0;
+
+                    if (action && action.calc_mode === 'duration') {
+                         // Duration Logic: 120s = 100 points
+                         const seconds = parseFloat(r.count || 0);
+                         currentScore = Math.min((seconds / 120) * 100, 120);
+                    } else {
+                         // 1RM Logic
+                         const w = parseFloat(r.weight || 0);
+                         const reps = parseFloat(r.count || 0);
+                         if (w > 0 && reps > 0) {
+                            const est1RM = w * (1 + reps / 30);
+                            const ratio = est1RM / userWeight;
+                            
+                            let kStd = 1.0;
+                            if (muscle === '胸') kStd = 1.5;
+                            else if (muscle === '背') kStd = 2.0; 
+                            else if (muscle === '腿') kStd = 1.6;
+                            else if (muscle === '肩') kStd = 0.9;
+                            
+                            currentScore = Math.min((ratio / kStd) * 100, 120);
+                         }
                     }
+                    
+                    if (currentScore > maxScore) maxScore = currentScore;
                 });
                 
-                if (max1RM > 0) {
-                    const ratio = max1RM / userWeight;
-                    let kStd = 1.0;
-                    if (muscle === '胸') kStd = 1.5;
-                    else if (muscle === '背') kStd = 2.0; 
-                    else if (muscle === '腿') kStd = 2.0;
-                    else if (muscle === '肩') kStd = 0.9;
-                    
-                    let scoreInt = Math.min((ratio / kStd) * 100, 120);
-                    scores[muscle].int = scoreInt;
-                }
+                scores[muscle].int = maxScore;
 
                 const last28DaysLogs = logs.filter(r => new Date(r.date) >= twentyEightDaysAgo);
                 if (last28DaysLogs.length > 0) {
@@ -2278,7 +2368,19 @@
                 } else if (muscle === '腿') {
                     const num = Math.min(balanceStats.squat, balanceStats.hinge);
                     const den = Math.max(balanceStats.squat, balanceStats.hinge);
-                    scoreBal = den === 0 ? 0 : (num / den) * 100;
+                    
+                    if (den === 0) {
+                        scoreBal = 0;
+                    } else {
+                        const ratio = num / den;
+                        // Relaxed logic: Allow up to 2:1 imbalance (ratio >= 0.5)
+                        if (ratio >= 0.5) {
+                            scoreBal = 100;
+                        } else {
+                            // Penalize only if imbalance > 2:1
+                            scoreBal = (ratio / 0.5) * 100;
+                        }
+                    }
                 }
                 scores[muscle].bal = scoreBal;
             });
@@ -2735,6 +2837,19 @@
           return new Date(dateStr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         };
 
+        const formatRecordDisplay = (record) => {
+            const action = allActions.value.find(a => a.label === record.actionType || a.name === record.actionType);
+            if (action && action.calc_mode === 'duration') {
+                const seconds = parseInt(record.count);
+                if (seconds < 60) return `${seconds} <span class="text-xs font-medium text-base-content/40">秒</span>`;
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                if (s === 0) return `${m} <span class="text-xs font-medium text-base-content/40">分</span>`;
+                return `${m} <span class="text-xs font-medium text-base-content/40">分</span> ${s} <span class="text-xs font-medium text-base-content/40">秒</span>`;
+            }
+            return `${record.count} <span class="text-xs font-medium text-base-content/40">次</span>`;
+        };
+
         return { 
           showRadarInfo,
           handleRepeat,
@@ -2764,6 +2879,7 @@
           getIcon, 
           getActionColor, 
           formatTime, 
+          formatRecordDisplay,
           userInitial, 
           deletingId,
           isRestTimerOpen,
