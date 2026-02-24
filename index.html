@@ -1786,13 +1786,18 @@
             try {
                 // Check cache
                 const cached = localStorage.getItem('cachedActions');
-                if (!force && cached) {
-                    allActions.value = JSON.parse(cached);
-                    // If we have cache, we can still fetch in background to update, or just return.
-                    // For now, if we have cache, we assume it's good unless forced.
-                    if (allActions.value.length > 0) {
-                        actionsLoading.value = false;
-                        return;
+                const cachedTime = localStorage.getItem('cachedActionsTime');
+                const now = Date.now();
+                const oneDay = 24 * 60 * 60 * 1000;
+
+                if (!force && cached && cachedTime) {
+                    const diff = now - parseInt(cachedTime);
+                    if (diff < oneDay) {
+                         allActions.value = JSON.parse(cached);
+                         if (allActions.value.length > 0) {
+                             actionsLoading.value = false;
+                             return;
+                         }
                     }
                 }
 
@@ -1837,11 +1842,15 @@
                     
                     allActions.value = mapped;
                     localStorage.setItem('cachedActions', JSON.stringify(mapped));
+                    localStorage.setItem('cachedActionsTime', Date.now().toString());
                 }
             } catch (e) {
                 console.error('Failed to fetch actions:', e);
-                // Fallback to hardcoded if empty?
-                if (allActions.value.length === 0) {
+                // Fallback to cache if network fails, even if expired
+                const cached = localStorage.getItem('cachedActions');
+                if (cached) {
+                    allActions.value = JSON.parse(cached);
+                } else if (allActions.value.length === 0) {
                      allActions.value = [
                         { id: 'pull_ups', name: 'Pull Up', label: '引体向上', kcal: 0.5, icon: '💪', color: 'bg-blue-100 text-blue-600', target_muscle_group: '背部' },
                         { id: 'push_ups', name: 'Push Up', label: '俯卧撑', kcal: 0.2, icon: '🤸', color: 'bg-purple-100 text-purple-600', target_muscle_group: '胸部' }
