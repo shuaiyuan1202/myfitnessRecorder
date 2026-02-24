@@ -1782,25 +1782,55 @@
         };
 
         const fetchActions = async (force = false) => {
-            actionsLoading.value = true;
-            try {
-                // Check cache
-                const cached = localStorage.getItem('cachedActions');
-                const cachedTime = localStorage.getItem('cachedActionsTime');
-                const now = Date.now();
-                const oneDay = 24 * 60 * 60 * 1000;
+            // Strategy: 
+            // 1. Always load cache first if available (silent update)
+            // 2. Only show loading if manual force refresh OR no cache exists
+            // 3. Background fetch if expired
+            
+            const cached = localStorage.getItem('cachedActions');
+            const cachedTime = localStorage.getItem('cachedActionsTime');
+            const now = Date.now();
+            const oneDay = 24 * 60 * 60 * 1000;
+            
+            let shouldFetch = false;
+            let hasCache = false;
 
-                if (!force && cached && cachedTime) {
-                    const diff = now - parseInt(cachedTime);
-                    if (diff < oneDay) {
-                         allActions.value = JSON.parse(cached);
-                         if (allActions.value.length > 0) {
-                             actionsLoading.value = false;
-                             return;
-                         }
+            // Load cache immediately
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.length > 0) {
+                        allActions.value = parsed;
+                        hasCache = true;
                     }
+                } catch (e) {
+                    console.error("Invalid cache", e);
                 }
+            }
 
+            // Decide if we need to fetch
+            if (force) {
+                // Manual refresh: Always fetch and show loading
+                shouldFetch = true;
+                actionsLoading.value = true;
+            } else if (!hasCache) {
+                // No cache: Must fetch and show loading
+                shouldFetch = true;
+                actionsLoading.value = true;
+            } else {
+                // Has cache: Check expiration
+                // Silent update if expired (actionsLoading remains false)
+                if (!cachedTime || (now - parseInt(cachedTime) > oneDay)) {
+                    shouldFetch = true;
+                }
+            }
+
+            if (!shouldFetch) {
+                actionsLoading.value = false;
+                return;
+            }
+
+            try {
                 const response = await axios.get('/api/get-actions');
                 if (response.data.success) {
                     const mapped = response.data.data.map(item => {
@@ -1846,11 +1876,8 @@
                 }
             } catch (e) {
                 console.error('Failed to fetch actions:', e);
-                // Fallback to cache if network fails, even if expired
-                const cached = localStorage.getItem('cachedActions');
-                if (cached) {
-                    allActions.value = JSON.parse(cached);
-                } else if (allActions.value.length === 0) {
+                // Fallback if no cache was present and fetch failed
+                if (allActions.value.length === 0) {
                      allActions.value = [
                         { id: 'pull_ups', name: 'Pull Up', label: '引体向上', kcal: 0.5, icon: '💪', color: 'bg-blue-100 text-blue-600', target_muscle_group: '背部' },
                         { id: 'push_ups', name: 'Push Up', label: '俯卧撑', kcal: 0.2, icon: '🤸', color: 'bg-purple-100 text-purple-600', target_muscle_group: '胸部' }
