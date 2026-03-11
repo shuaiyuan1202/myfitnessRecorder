@@ -23,6 +23,7 @@
   <script src="./lib/vue-demi.js"></script>
   <script src="./lib/vue-router.global.prod.js"></script>    
   <script src="./lib/axios.min.js"></script>
+  <script src="https://unpkg.com/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
   <!-- Pinia -->
   <script src="./lib/pinia.iife.min.js"></script>
 
@@ -109,6 +110,66 @@
                 >
                     <span v-if="loading" class="loading loading-spinner"></span>
                     <span v-else>保存信息</span>
+                </button>
+            </div>
+        </div>
+    </div>
+  </script>
+
+  <script type="text/x-template" id="avatar-modal-template">
+    <div v-if="isOpen" class="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="close"></div>
+        <div class="relative w-full max-w-lg bg-base-100 rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl transform transition-transform animate-slide-up overflow-hidden">
+            <div class="w-12 h-1.5 bg-base-300 rounded-full mx-auto mb-6 opacity-50"></div>
+
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-black text-base-content">修改头像</h3>
+                <button class="btn btn-sm btn-circle btn-ghost" @click="close" :disabled="loading">✕</button>
+            </div>
+
+            <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileChange" />
+
+            <button class="btn btn-outline w-full rounded-2xl font-bold mb-4" @click="pickFile" :disabled="loading">
+                选择照片
+            </button>
+
+            <div class="flex flex-col items-center gap-4">
+                <div class="w-60 h-60 rounded-[2rem] overflow-hidden bg-base-200 shadow-inner flex items-center justify-center select-none">
+                    <canvas
+                        ref="previewCanvas"
+                        :width="previewSize"
+                        :height="previewSize"
+                        class="w-full h-full touch-none"
+                        @pointerdown="onPointerDown"
+                        @pointermove="onPointerMove"
+                        @pointerup="onPointerUp"
+                        @pointercancel="onPointerUp"
+                    ></canvas>
+                </div>
+
+                <div class="w-full">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-xs font-bold text-base-content/60">缩放</div>
+                        <button class="btn btn-ghost btn-xs text-base-content/60" @click="reset" :disabled="!imageLoaded || loading">重置</button>
+                    </div>
+                    <input
+                        type="range"
+                        class="range range-primary"
+                        :min="minZoom"
+                        :max="maxZoom"
+                        step="0.01"
+                        v-model.number="zoom"
+                        @input="draw"
+                        :disabled="!imageLoaded || loading"
+                    />
+                </div>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+                <button class="btn btn-ghost flex-1 rounded-2xl" @click="close" :disabled="loading">取消</button>
+                <button class="btn btn-primary flex-1 rounded-2xl font-bold shadow-xl shadow-primary/20" @click="confirm" :disabled="!imageLoaded || loading">
+                    <span v-if="loading" class="loading loading-spinner"></span>
+                    <span v-else>确定</span>
                 </button>
             </div>
         </div>
@@ -380,9 +441,16 @@
                      </div>
                      <div class="dropdown dropdown-end">
                         <div tabindex="0" role="button" class="btn btn-circle btn-ghost bg-base-200 hover:bg-base-300 border-none shadow-sm">
-                           <span class="text-xl font-bold text-primary">{{ userInitial }}</span>
+                           <img
+                             v-if="authStore.userConfig?.profileImage"
+                             :src="authStore.userConfig.profileImage"
+                             class="w-10 h-10 rounded-full object-cover"
+                             alt="avatar"
+                           />
+                           <span v-else class="text-xl font-bold text-primary">{{ userInitial }}</span>
                         </div>
                         <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100 rounded-2xl w-40 border border-base-200">
+                          <li><a @click="openAvatarModal" class="font-medium">修改头像</a></li>
                           <li><a @click="logout" class="text-error font-medium">退出登录</a></li>
                         </ul>
                      </div>
@@ -565,22 +633,43 @@
                     <span class="loading loading-spinner loading-lg text-primary"></span>
                 </div>
 
-                <div v-else>
+                <div v-else class="overflow-hidden">
                     <!-- History Heatmap View -->
                     <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 overflow-hidden mb-6" style="overflow: visible !important;">
                         <div class="overflow-x-auto pb-2 scrollbar-hide" style="direction: rtl; overflow: visible !important;">
                             <!-- Grid Container (Reversed direction for RTL to start from right) -->
-                            <div class="grid grid-rows-7 grid-flow-col gap-1 w-max ltr" style="direction: ltr;">
+                            <div class="grid grid-rows-9 grid-flow-col gap-1 w-max ltr" style="direction: ltr;">
                                <div 
-                                  v-for="(day, index) in heatmapData" 
+                                  v-for="(cell, index) in heatmapGridCells" 
                                   :key="index"
-                                  class="w-3 h-3 rounded-[2px] transition-colors hover:ring-2 ring-primary/50 relative group cursor-pointer"
-                                  :class="[day.color, {'invisible': day.invisible}]"
+                                  class="relative"
+                                  :class="cell.type === 'day' ? 'w-3 h-3 rounded-[2px] transition-colors hover:ring-2 ring-primary/50 group cursor-pointer' : 'w-3 h-4 flex items-center justify-center overflow-hidden'"
                                >
-                                  <!-- Tooltip -->
-                                  <div v-if="!day.invisible" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
-                                      {{ day.date }}: {{ day.count }} 组
-                                  </div>
+                                  <template v-if="cell.type === 'day'">
+                                      <div class="w-3 h-3 rounded-[2px] transition-colors" :class="[cell.color, {'invisible': cell.invisible}]"></div>
+                                      <div v-if="!cell.invisible" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
+                                          {{ cell.dateLabel }}: {{ cell.count }} 组
+                                      </div>
+                                  </template>
+
+                                  <template v-else-if="cell.type === 'month'">
+                                      <div 
+                                        v-if="cell.visible"
+                                        class="text-[10px] font-black tabular-nums leading-none"
+                                        :class="cell.isCurrent ? 'text-primary' : 'text-base-content/30'"
+                                      >
+                                        {{ cell.month }}
+                                      </div>
+                                  </template>
+
+                                  <template v-else-if="cell.type === 'year'">
+                                      <div 
+                                        v-if="cell.visible"
+                                        class="text-[10px] font-bold tabular-nums text-base-content/30 leading-none"
+                                      >
+                                        {{ cell.year }}
+                                      </div>
+                                  </template>
                                </div>
                             </div>
                         </div>
@@ -827,6 +916,13 @@
             :loading="hwLoading"
             @save="saveUserInfo"
         ></height-weight-modal>
+
+        <avatar-upload-modal
+            :is-open="isAvatarModalOpen"
+            :loading="avatarLoading"
+            @close="closeAvatarModal"
+            @confirm="handleAvatarConfirm"
+        ></avatar-upload-modal>
 
         <delete-confirmation-modal
             :is-open="isDeleteModalOpen"
@@ -1425,6 +1521,253 @@
       }
     });
 
+    const AvatarUploadModal = defineComponent({
+      template: '#avatar-modal-template',
+      props: ['isOpen', 'loading'],
+      emits: ['close', 'confirm'],
+      setup(props, { emit }) {
+        const previewSize = 240;
+        const outputSize = 200;
+        const fileInput = ref(null);
+        const previewCanvas = ref(null);
+
+        const img = ref(null);
+        const imageLoaded = ref(false);
+
+        const zoom = ref(1);
+        const minZoom = ref(1);
+        const maxZoom = ref(4);
+        const panX = ref(0);
+        const panY = ref(0);
+
+        const dragging = ref(false);
+        let dragPointerId = null;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let dragStartPanX = 0;
+        let dragStartPanY = 0;
+
+        const pickFile = () => {
+          if (props.loading) return;
+          fileInput.value?.click();
+        };
+
+        const reset = () => {
+          if (!imageLoaded.value || props.loading) return;
+          zoom.value = minZoom.value;
+          panX.value = 0;
+          panY.value = 0;
+          draw();
+        };
+
+        const draw = () => {
+          const canvas = previewCanvas.value;
+          const image = img.value;
+          if (!canvas || !image) return;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+
+          ctx.clearRect(0, 0, previewSize, previewSize);
+          ctx.fillStyle = '#000000';
+          ctx.globalAlpha = 0.06;
+          ctx.fillRect(0, 0, previewSize, previewSize);
+          ctx.globalAlpha = 1;
+
+          const drawW = image.naturalWidth * zoom.value;
+          const drawH = image.naturalHeight * zoom.value;
+
+          const baseX = (previewSize - drawW) / 2;
+          const baseY = (previewSize - drawH) / 2;
+
+          let x = baseX + panX.value;
+          let y = baseY + panY.value;
+
+          const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+
+          if (drawW > previewSize) {
+            x = clamp(x, previewSize - drawW, 0);
+          } else {
+            x = baseX;
+          }
+
+          if (drawH > previewSize) {
+            y = clamp(y, previewSize - drawH, 0);
+          } else {
+            y = baseY;
+          }
+
+          panX.value = x - baseX;
+          panY.value = y - baseY;
+
+          ctx.drawImage(image, x, y, drawW, drawH);
+        };
+
+        const onFileChange = async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+
+          imageLoaded.value = false;
+          img.value = null;
+          panX.value = 0;
+          panY.value = 0;
+
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          });
+
+          const loadedImg = await new Promise((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => resolve(i);
+            i.onerror = () => reject(new Error('Image load failed'));
+            i.src = dataUrl;
+          });
+
+          img.value = loadedImg;
+          const min = Math.max(previewSize / loadedImg.naturalWidth, previewSize / loadedImg.naturalHeight);
+          minZoom.value = min;
+          maxZoom.value = min * 4;
+          zoom.value = min;
+          imageLoaded.value = true;
+
+          await nextTick();
+          draw();
+        };
+
+        const onPointerDown = (e) => {
+          if (!imageLoaded.value || props.loading) return;
+          const canvas = previewCanvas.value;
+          if (!canvas) return;
+
+          dragging.value = true;
+          dragPointerId = e.pointerId;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          dragStartPanX = panX.value;
+          dragStartPanY = panY.value;
+          canvas.setPointerCapture?.(e.pointerId);
+        };
+
+        const onPointerMove = (e) => {
+          if (!dragging.value || props.loading) return;
+          if (dragPointerId !== null && e.pointerId !== dragPointerId) return;
+          panX.value = dragStartPanX + (e.clientX - dragStartX);
+          panY.value = dragStartPanY + (e.clientY - dragStartY);
+          draw();
+        };
+
+        const onPointerUp = (e) => {
+          if (dragPointerId !== null && e.pointerId !== dragPointerId) return;
+          dragging.value = false;
+          dragPointerId = null;
+        };
+
+        const close = () => {
+          if (props.loading) return;
+          emit('close');
+        };
+
+        const confirm = async () => {
+          if (!imageLoaded.value || props.loading) return;
+          if (!window.imageCompression) {
+            alert('图片处理组件加载失败，请刷新页面重试');
+            return;
+          }
+
+          const image = img.value;
+          if (!image) return;
+
+          const scaleFactor = outputSize / previewSize;
+          const outZoom = zoom.value * scaleFactor;
+          const outPanX = panX.value * scaleFactor;
+          const outPanY = panY.value * scaleFactor;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = outputSize;
+          canvas.height = outputSize;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+
+          const drawW = image.naturalWidth * outZoom;
+          const drawH = image.naturalHeight * outZoom;
+          const baseX = (outputSize - drawW) / 2;
+          const baseY = (outputSize - drawH) / 2;
+
+          const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+
+          let x = baseX + outPanX;
+          let y = baseY + outPanY;
+          if (drawW > outputSize) x = clamp(x, outputSize - drawW, 0);
+          if (drawH > outputSize) y = clamp(y, outputSize - drawH, 0);
+
+          ctx.drawImage(image, x, y, drawW, drawH);
+
+          const baseBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+          if (!baseBlob) return;
+
+          const baseFile = new File([baseBlob], 'avatar.jpg', { type: 'image/jpeg' });
+          const compressedFile = await window.imageCompression(baseFile, {
+            maxSizeMB: 0.05,
+            maxWidthOrHeight: 200,
+            useWebWorker: true,
+            initialQuality: 0.9,
+            fileType: 'image/jpeg'
+          });
+
+          const finalDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(compressedFile);
+          });
+
+          emit('confirm', { dataUrl: finalDataUrl });
+        };
+
+        watch(() => props.isOpen, async (newVal) => {
+          if (!newVal) return;
+          await nextTick();
+          const canvas = previewCanvas.value;
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          ctx.clearRect(0, 0, previewSize, previewSize);
+          ctx.fillStyle = '#000000';
+          ctx.globalAlpha = 0.06;
+          ctx.fillRect(0, 0, previewSize, previewSize);
+          ctx.globalAlpha = 1;
+        });
+
+        watch(zoom, () => {
+          if (!imageLoaded.value) return;
+          draw();
+        });
+
+        return {
+          previewSize,
+          fileInput,
+          previewCanvas,
+          imageLoaded,
+          zoom,
+          minZoom,
+          maxZoom,
+          pickFile,
+          onFileChange,
+          onPointerDown,
+          onPointerMove,
+          onPointerUp,
+          reset,
+          draw,
+          close,
+          confirm
+        };
+      }
+    });
+
     // DeleteConfirmationModal
     const DeleteConfirmationModal = defineComponent({
       template: '#delete-modal-template',
@@ -1480,7 +1823,7 @@
     // Dashboard
     const Dashboard = defineComponent({
       template: '#dashboard-template',
-      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal, HeightWeightModal, DeleteConfirmationModal },
+      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal, HeightWeightModal, AvatarUploadModal, DeleteConfirmationModal },
       setup() {
         const router = useRouter();
         const authStore = useAuthStore();
@@ -1556,6 +1899,42 @@
             } finally {
                 hwLoading.value = false;
             }
+        };
+
+        const isAvatarModalOpen = ref(false);
+        const avatarLoading = ref(false);
+
+        const openAvatarModal = () => {
+          isAvatarModalOpen.value = true;
+        };
+
+        const closeAvatarModal = () => {
+          if (avatarLoading.value) return;
+          isAvatarModalOpen.value = false;
+        };
+
+        const handleAvatarConfirm = async ({ dataUrl }) => {
+          const userId = authStore.userConfig?.userId;
+          if (!userId) {
+            alert('登录信息缺失，请重新登录');
+            return;
+          }
+
+          avatarLoading.value = true;
+          try {
+            const res = await axios.post('/api/upload-avatar', { userId, dataUrl });
+            if (res.data?.success && res.data?.url) {
+              authStore.updateConfig({ profileImage: res.data.url });
+              isAvatarModalOpen.value = false;
+            } else {
+              alert(res.data?.error || '上传失败，请重试');
+            }
+          } catch (e) {
+            console.error('Failed to upload avatar:', e);
+            alert('上传失败，请重试');
+          } finally {
+            avatarLoading.value = false;
+          }
         };
 
         // --- Swipe to Delete Logic ---
@@ -1688,16 +2067,18 @@
             // 3. Check and Fetch User Info (Height & Weight)
             const config = authStore.userConfig;
             if (config) {
-                if (!config.weight || !config.height) {
+                if (!config.weight || !config.height || !config.profileImage) {
                     try {
                         const res = await axios.post('/api/get-user-info', { userId: config.userId });
                         if (res.data.success) {
                             const cloudConfig = res.data.userConfig;
-                            // Check if cloud has info
-                            if (cloudConfig.weight && cloudConfig.height) {
-                                authStore.updateConfig(cloudConfig);
-                            } else {
-                                // Cloud also missing -> Prompt
+                            const toUpdate = {};
+                            if (cloudConfig.weight) toUpdate.weight = cloudConfig.weight;
+                            if (cloudConfig.height) toUpdate.height = cloudConfig.height;
+                            if (cloudConfig.profileImage) toUpdate.profileImage = cloudConfig.profileImage;
+                            if (Object.keys(toUpdate).length > 0) authStore.updateConfig(toUpdate);
+
+                            if ((!config.weight || !config.height) && !(cloudConfig.weight && cloudConfig.height)) {
                                 isHWModalOpen.value = true;
                             }
                         }
@@ -2210,7 +2591,7 @@
              // Pad start to align with day of week (assuming Row 1 is Sunday)
              const startDay = oneYearAgo.getDay(); // 0-6
              for (let i = 0; i < startDay; i++) {
-                 days.push({ date: '', count: 0, color: 'bg-transparent', invisible: true });
+                 days.push({ dateLabel: '', dateObj: null, count: 0, color: 'bg-transparent', invisible: true });
              }
 
              // Create map of date -> count
@@ -2231,8 +2612,10 @@
                  if (count >= 25) color = 'bg-green-800';
                  if (count >= 40) color = 'bg-green-950';
                  
+                 const dateObj = new Date(d.getTime());
                  days.push({
-                     date: d.toLocaleDateString(),
+                     dateLabel: dateObj.toLocaleDateString(),
+                     dateObj,
                      count,
                      color,
                      invisible: false
@@ -2240,6 +2623,57 @@
              }
              return days;
          });
+
+        const heatmapGridCells = computed(() => {
+            const days = heatmapData.value;
+            if (!days || days.length === 0) return [];
+
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            const columns = Math.ceil(days.length / 7);
+            const cells = [];
+
+            for (let c = 0; c < columns; c++) {
+                let monthCell = { type: 'month', visible: false, month: '', year: null, isCurrent: false };
+                let yearCell = { type: 'year', visible: false, year: '' };
+
+                for (let r = 0; r < 7; r++) {
+                    const day = days[c * 7 + r];
+                    if (!day || day.invisible || !day.dateObj) continue;
+                    const dt = day.dateObj;
+                    if (dt.getDate() === 1) {
+                        monthCell = {
+                            type: 'month',
+                            visible: true,
+                            month: dt.getMonth() + 1,
+                            year: dt.getFullYear(),
+                            isCurrent: dt.getMonth() === currentMonth && dt.getFullYear() === currentYear
+                        };
+                        if (dt.getMonth() === 0) {
+                            yearCell = { type: 'year', visible: true, year: dt.getFullYear() };
+                        }
+                        break;
+                    }
+                }
+
+                cells.push(monthCell);
+
+                for (let r = 0; r < 7; r++) {
+                    const day = days[c * 7 + r];
+                    if (day) {
+                        cells.push({ type: 'day', ...day });
+                    } else {
+                        cells.push({ type: 'day', dateLabel: '', dateObj: null, count: 0, color: 'bg-transparent', invisible: true });
+                    }
+                }
+
+                cells.push(yearCell);
+            }
+
+            return cells;
+        });
 
         const historyStatsText = computed(() => {
             const currentMonth = new Date().getMonth();
@@ -2922,6 +3356,7 @@
           activeTab,
           switchTab,
           heatmapData,
+          heatmapGridCells,
           historyStatsText,
           allHistory,
           historyLoading, // Added this
@@ -2959,6 +3394,11 @@
           isHWModalOpen,
           hwLoading,
           saveUserInfo,
+          isAvatarModalOpen,
+          avatarLoading,
+          openAvatarModal,
+          closeAvatarModal,
+          handleAvatarConfirm,
           // Stats
           getTodaySetsForAction,
           repeatInitialCount,

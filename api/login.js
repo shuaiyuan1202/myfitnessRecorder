@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     const { rows } = await sql`
-      SELECT user_id, username, name, configuration, preferred_action, weight_kg
+      SELECT user_id, username, name, configuration, preferred_action, weight_kg, profile_image
       FROM "User" 
       WHERE username = ${username} AND password = ${password}
     `;
@@ -47,6 +47,7 @@ export default async function handler(req, res) {
           username: user.username,
           nickname: user.name,
           weight: user.weight_kg,
+          profileImage: user.profile_image,
           configuration: config,
           preferredAction: preferredAction
         }

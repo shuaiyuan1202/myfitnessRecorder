@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     const { rows } = await sql`
-      SELECT user_id, username, name, weight_kg, height_cm 
+      SELECT user_id, username, name, weight_kg, height_cm, profile_image
       FROM "User" 
       WHERE user_id = ${userId}
     `;
@@ -30,7 +30,8 @@ export default async function handler(req, res) {
       username: user.username,
       nickname: user.name,
       weight: user.weight_kg,
-      height: user.height_cm
+      height: user.height_cm,
+      profileImage: user.profile_image
     };
 
     res.status(200).json({ success: true, userConfig });

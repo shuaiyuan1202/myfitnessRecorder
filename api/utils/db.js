@@ -14,6 +14,9 @@ const rootDir = path.resolve(__dirname, '../../');
 // Try to load .env.development.local first (for local dev with Vercel CLI generated files)
 dotenv.config({ path: path.resolve(rootDir, '.env.development.local') });
 
+// Then try to load .env.local (common local override)
+dotenv.config({ path: path.resolve(rootDir, '.env.local') });
+
 // Then try to load .env (standard)
 dotenv.config({ path: path.resolve(rootDir, '.env') });
 
