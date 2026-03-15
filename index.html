@@ -176,6 +176,50 @@
     </div>
   </script>
 
+  <script type="text/x-template" id="profile-modal-template">
+    <div v-if="isOpen" class="fixed inset-0 z-[85] flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="close"></div>
+        <div class="relative w-full max-w-sm mx-6 bg-base-100 rounded-3xl p-6 shadow-2xl animate-slide-up">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" @click="close">✕</button>
+            <div class="flex flex-col items-center">
+                <button class="w-24 h-24 rounded-full overflow-hidden bg-base-200 shadow-inner" @click="openViewer">
+                    <img v-if="profileImage" :src="profileImage" class="w-full h-full object-cover" alt="avatar" />
+                    <div v-else class="w-full h-full flex items-center justify-center text-3xl font-black text-primary">{{ initial }}</div>
+                </button>
+
+                <div class="mt-4 text-xl font-black text-base-content">{{ displayName }}</div>
+
+                <div class="mt-5 w-full bg-base-200/50 rounded-2xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm font-bold text-base-content/60">身高</div>
+                        <div class="text-sm font-black text-base-content">{{ heightDisplay }}</div>
+                    </div>
+                    <div class="flex items-center justify-between mt-3">
+                        <div class="text-sm font-bold text-base-content/60">体重</div>
+                        <div class="text-sm font-black text-base-content">{{ weightDisplay }}</div>
+                    </div>
+                    <button class="btn btn-outline btn-sm w-full rounded-xl mt-4 font-bold" @click="editHW">修改身高体重</button>
+                </div>
+
+                <button class="btn btn-ghost w-full rounded-2xl mt-5 text-error font-bold" @click="logout">退出登录</button>
+            </div>
+        </div>
+    </div>
+  </script>
+
+  <script type="text/x-template" id="avatar-viewer-template">
+    <div v-if="isOpen" class="fixed inset-0 z-[95] bg-black/90 flex items-center justify-center">
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 text-white" @click="close">✕</button>
+        <div class="w-full h-full flex items-center justify-center px-6">
+            <img v-if="src" :src="src" class="max-w-full max-h-full object-contain" alt="avatar" />
+            <div v-else class="text-white/60 font-bold">暂无头像</div>
+        </div>
+        <div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black/80 to-transparent">
+            <button class="btn btn-primary w-full rounded-2xl font-bold shadow-xl shadow-black/20" @click="editAvatar">修改头像</button>
+        </div>
+    </div>
+  </script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -439,21 +483,15 @@
                        <p class="text-sm text-base-content/60 font-medium">你好，</p>
                        <h1 class="text-2xl font-black text-base-content">{{ authStore.userConfig?.nickname || authStore.userConfig?.username || 'Athlete' }}</h1>
                      </div>
-                     <div class="dropdown dropdown-end">
-                        <div tabindex="0" role="button" class="btn btn-circle btn-ghost bg-base-200 hover:bg-base-300 border-none shadow-sm">
-                           <img
-                             v-if="authStore.userConfig?.profileImage"
-                             :src="authStore.userConfig.profileImage"
-                             class="w-10 h-10 rounded-full object-cover"
-                             alt="avatar"
-                           />
-                           <span v-else class="text-xl font-bold text-primary">{{ userInitial }}</span>
-                        </div>
-                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100 rounded-2xl w-40 border border-base-200">
-                          <li><a @click="openAvatarModal" class="font-medium">修改头像</a></li>
-                          <li><a @click="logout" class="text-error font-medium">退出登录</a></li>
-                        </ul>
-                     </div>
+                     <button @click="openProfileModal" class="btn btn-circle btn-ghost bg-base-200 hover:bg-base-300 border-none shadow-sm">
+                        <img
+                          v-if="authStore.userConfig?.profileImage"
+                          :src="authStore.userConfig.profileImage"
+                          class="w-10 h-10 rounded-full object-cover"
+                          alt="avatar"
+                        />
+                        <span v-else class="text-xl font-bold text-primary">{{ userInitial }}</span>
+                     </button>
                    </div>
             
                    <!-- Main Stats Card -->
@@ -914,8 +952,30 @@
         <height-weight-modal
             :is-open="isHWModalOpen"
             :loading="hwLoading"
+            :initial-height="authStore.userConfig?.height"
+            :initial-weight="authStore.userConfig?.weight"
             @save="saveUserInfo"
         ></height-weight-modal>
+
+        <profile-modal
+            :is-open="isProfileModalOpen"
+            :profile-image="authStore.userConfig?.profileImage"
+            :display-name="authStore.userConfig?.nickname || authStore.userConfig?.username || 'Athlete'"
+            :initial="userInitial"
+            :height="authStore.userConfig?.height"
+            :weight="authStore.userConfig?.weight"
+            @close="closeProfileModal"
+            @open-viewer="openAvatarViewer"
+            @edit-hw="openHWEditor"
+            @logout="logoutFromProfile"
+        ></profile-modal>
+
+        <avatar-viewer-modal
+            :is-open="isAvatarViewerOpen"
+            :src="authStore.userConfig?.profileImage"
+            @close="closeAvatarViewer"
+            @edit-avatar="editAvatarFromViewer"
+        ></avatar-viewer-modal>
 
         <avatar-upload-modal
             :is-open="isAvatarModalOpen"
@@ -1501,11 +1561,25 @@
     // HeightWeightModal
     const HeightWeightModal = defineComponent({
       template: '#hw-modal-template',
-      props: ['isOpen', 'loading'],
+      props: ['isOpen', 'loading', 'initialHeight', 'initialWeight'],
       emits: ['save'],
       setup(props, { emit }) {
         const height = ref('');
         const weight = ref('');
+
+        watch(() => props.isOpen, (newVal) => {
+            if (!newVal) return;
+            if (props.initialHeight !== undefined && props.initialHeight !== null && props.initialHeight !== '') {
+                height.value = props.initialHeight;
+            } else {
+                height.value = '';
+            }
+            if (props.initialWeight !== undefined && props.initialWeight !== null && props.initialWeight !== '') {
+                weight.value = props.initialWeight;
+            } else {
+                weight.value = '';
+            }
+        });
         
         const isValid = computed(() => {
             return height.value > 50 && height.value < 300 && weight.value > 20 && weight.value < 300;
@@ -1768,6 +1842,43 @@
       }
     });
 
+    const ProfileModal = defineComponent({
+      template: '#profile-modal-template',
+      props: ['isOpen', 'profileImage', 'displayName', 'initial', 'height', 'weight'],
+      emits: ['close', 'open-viewer', 'edit-hw', 'logout'],
+      setup(props, { emit }) {
+        const heightDisplay = computed(() => {
+          const v = props.height;
+          if (v === undefined || v === null || v === '') return '--';
+          return `${v} cm`;
+        });
+
+        const weightDisplay = computed(() => {
+          const v = props.weight;
+          if (v === undefined || v === null || v === '') return '--';
+          return `${v} kg`;
+        });
+
+        const close = () => emit('close');
+        const openViewer = () => emit('open-viewer');
+        const editHW = () => emit('edit-hw');
+        const logout = () => emit('logout');
+
+        return { heightDisplay, weightDisplay, close, openViewer, editHW, logout };
+      }
+    });
+
+    const AvatarViewerModal = defineComponent({
+      template: '#avatar-viewer-template',
+      props: ['isOpen', 'src'],
+      emits: ['close', 'edit-avatar'],
+      setup(props, { emit }) {
+        const close = () => emit('close');
+        const editAvatar = () => emit('edit-avatar');
+        return { close, editAvatar };
+      }
+    });
+
     // DeleteConfirmationModal
     const DeleteConfirmationModal = defineComponent({
       template: '#delete-modal-template',
@@ -1823,7 +1934,7 @@
     // Dashboard
     const Dashboard = defineComponent({
       template: '#dashboard-template',
-      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal, HeightWeightModal, AvatarUploadModal, DeleteConfirmationModal },
+      components: { NumberSelectorModal, RestTimerModal, PreferenceSelectorModal, HeightWeightModal, AvatarUploadModal, ProfileModal, AvatarViewerModal, DeleteConfirmationModal },
       setup() {
         const router = useRouter();
         const authStore = useAuthStore();
@@ -1935,6 +2046,41 @@
           } finally {
             avatarLoading.value = false;
           }
+        };
+
+        const isProfileModalOpen = ref(false);
+        const isAvatarViewerOpen = ref(false);
+
+        const openProfileModal = () => {
+          isProfileModalOpen.value = true;
+        };
+
+        const closeProfileModal = () => {
+          isProfileModalOpen.value = false;
+        };
+
+        const openAvatarViewer = () => {
+          isAvatarViewerOpen.value = true;
+        };
+
+        const closeAvatarViewer = () => {
+          isAvatarViewerOpen.value = false;
+        };
+
+        const openHWEditor = () => {
+          isProfileModalOpen.value = false;
+          isHWModalOpen.value = true;
+        };
+
+        const logoutFromProfile = () => {
+          isProfileModalOpen.value = false;
+          logout();
+        };
+
+        const editAvatarFromViewer = () => {
+          isAvatarViewerOpen.value = false;
+          isProfileModalOpen.value = false;
+          openAvatarModal();
         };
 
         // --- Swipe to Delete Logic ---
@@ -3394,6 +3540,15 @@
           isHWModalOpen,
           hwLoading,
           saveUserInfo,
+          isProfileModalOpen,
+          openProfileModal,
+          closeProfileModal,
+          isAvatarViewerOpen,
+          openAvatarViewer,
+          closeAvatarViewer,
+          openHWEditor,
+          logoutFromProfile,
+          editAvatarFromViewer,
           isAvatarModalOpen,
           avatarLoading,
           openAvatarModal,
