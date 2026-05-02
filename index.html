@@ -516,6 +516,20 @@
                      </div>
                    </div>
                 </header>
+
+                <!-- Rest Timer Banner -->
+                <div v-if="lastRecordTime" class="px-4 pb-4">
+                    <div class="rounded-xl p-2.5 flex items-center justify-between transition-colors" :class="isRestTimerWarning ? 'bg-warning/10 border border-warning/30' : 'bg-base-100 border border-base-200 shadow-sm'">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-base">{{ restTimerBannerIcon }}</span>
+                            <span class="text-xs font-bold truncate" :class="isRestTimerWarning ? 'text-warning' : 'text-base-content/60'">{{ restTimerBannerLabel }}</span>
+                        </div>
+                        <div class="flex items-baseline gap-1 flex-shrink-0 ml-3">
+                            <span class="text-lg font-black tabular-nums tracking-tight" :class="isRestTimerWarning ? 'text-warning' : 'text-base-content'">{{ restTimerDisplay }}</span>
+                            <span v-if="restTimerUnit" class="text-[10px] font-bold" :class="isRestTimerWarning ? 'text-warning/60' : 'text-base-content/40'">{{ restTimerUnit }}</span>
+                        </div>
+                    </div>
+                </div>
             
                 <!-- Sticky Header Group: Quick Actions + Today Title -->
                 <div class="sticky top-0 z-30 bg-base-200/95 backdrop-blur-md px-6 pt-2 pb-2 -mx-0 transition-all shadow-sm rounded-b-3xl">
@@ -1154,7 +1168,7 @@
                 <div class="relative w-48 h-48 mx-auto mb-8 flex items-center justify-center">
                     <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-base-200" stroke-width="8" />
-                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-primary transition-all duration-1000 ease-linear" stroke-width="8" :stroke-dasharray="283" :stroke-dashoffset="283 - (283 * timeLeft / totalTime)" stroke-linecap="round" />
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-primary transition-all duration-300 ease-linear" stroke-width="8" :stroke-dasharray="283" :stroke-dashoffset="283 - (283 * timeLeft / totalTime)" stroke-linecap="round" />
                     </svg>
                     <div class="absolute inset-0 flex items-center justify-center flex-col">
                         <span class="text-6xl font-black tabular-nums tracking-tighter">{{ timeLeft }}</span>
@@ -1470,24 +1484,31 @@
         const totalTime = 60;
         const timeLeft = ref(totalTime);
         let timer = null;
+        let timerEndTime = 0;
+
+        const updateTimeLeft = () => {
+            const remaining = Math.max(0, Math.ceil((timerEndTime - Date.now()) / 1000));
+            timeLeft.value = remaining;
+            if (remaining <= 0 && timer) {
+                if (navigator.vibrate) navigator.vibrate(50);
+                clearInterval(timer);
+                timer = null;
+            }
+        };
 
         const startTimer = () => {
             if (timer) clearInterval(timer);
+            timerEndTime = Date.now() + totalTime * 1000;
             timeLeft.value = totalTime;
-            timer = setInterval(() => {
-                if (timeLeft.value > 0) {
-                    timeLeft.value--;
-                } else {
-                    if (navigator.vibrate) navigator.vibrate(50);
-                    clearInterval(timer);
-                    timer = null;
-                }
-            }, 1000);
+            updateTimeLeft();
+            timer = setInterval(updateTimeLeft, 250);
         };
 
         const stopTimer = () => {
-            if (timer) clearInterval(timer);
-            timer = null;
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
         };
 
         watch(() => props.isOpen, (newVal) => {
@@ -1957,6 +1978,27 @@
         const isDeleteModalOpen = ref(false);
         const recordToDeleteId = ref(null);
         const deleteLoading = ref(false);
+
+        // Rest Timer Banner State
+        const lastRecordTime = ref(null);
+        const restTimerNow = ref(Date.now());
+        let restTimerTickId = null;
+
+        const startRestTimerTick = () => {
+            if (restTimerTickId) cancelAnimationFrame(restTimerTickId);
+            const tick = () => {
+                restTimerNow.value = Date.now();
+                restTimerTickId = requestAnimationFrame(tick);
+            };
+            restTimerTickId = requestAnimationFrame(tick);
+        };
+
+        const stopRestTimerTick = () => {
+            if (restTimerTickId) {
+                cancelAnimationFrame(restTimerTickId);
+                restTimerTickId = null;
+            }
+        };
         
         // Pump Data
         const pumpData = ref([]);
@@ -2195,6 +2237,8 @@
 
         // Load preferred actions and Init
         onMounted(async () => {
+            startRestTimerTick();
+
             // 2. Load Preferred Actions
             // Priority: LocalStorage -> UserConfig (fallback)
             let loaded = false;
@@ -2245,6 +2289,15 @@
             await fetchActions();
             await fetchHistory('today');
             fetchHistory('all');
+
+            // Initialize rest timer banner from today's latest record
+            if (history.value.length > 0) {
+                lastRecordTime.value = history.value[0].date;
+            }
+        });
+
+        onUnmounted(() => {
+            stopRestTimerTick();
         });
 
         const getCategoryMatch = (action, category) => {
@@ -3359,6 +3412,9 @@
                  // Play finish sound
                  const audio = new Audio('resources/finish.mp3');
                  audio.play().catch(e => console.log('Audio play failed:', e));
+
+                 // Update last record time for rest timer banner
+                 lastRecordTime.value = Date.now();
              }
         };
 
@@ -3504,6 +3560,59 @@
             return `${record.count} <span class="text-xs font-medium text-base-content/40">次</span>`;
         };
 
+        // --- Rest Timer Banner Computed ---
+        const elapsedSeconds = computed(() => {
+            if (!lastRecordTime.value) return 0;
+            return Math.max(0, Math.floor((restTimerNow.value - lastRecordTime.value) / 1000));
+        });
+
+        const restTimerDisplay = computed(() => {
+            const secs = elapsedSeconds.value;
+            if (secs < 60) return String(60 - secs);
+            const mins = Math.floor(secs / 60);
+            const remainSecs = secs % 60;
+            if (secs < 3600) {
+                if (mins === 0) return `${remainSecs} 秒`;
+                if (remainSecs === 0) return `${mins} 分`;
+                return `${mins} 分 ${remainSecs} 秒`;
+            }
+            const hrs = Math.floor(secs / 3600);
+            const remainMins = Math.floor((secs % 3600) / 60);
+            if (secs < 86400) {
+                if (remainMins === 0) return `${hrs} 小时`;
+                return `${hrs} 小时 ${remainMins} 分`;
+            }
+            const days = Math.floor(secs / 86400);
+            const remainHrs = Math.floor((secs % 86400) / 3600);
+            if (remainHrs === 0) return `${days} 天`;
+            return `${days} 天 ${remainHrs} 小时`;
+        });
+
+        const restTimerUnit = computed(() => {
+            return elapsedSeconds.value < 60 ? '秒' : '';
+        });
+
+        const restTimerBannerLabel = computed(() => {
+            const secs = elapsedSeconds.value;
+            if (secs < 60) return '休息倒计时';
+            if (secs < 3600) return '距离上组动作已过去';
+            if (secs < 86400) return '距离上次训练已过去';
+            return '距离上次动作已过去';
+        });
+
+        const restTimerBannerIcon = computed(() => {
+            const secs = elapsedSeconds.value;
+            if (secs < 60) return '⏱️';
+            if (secs < 3600) return '⏳';
+            if (secs < 86400) return '🕐';
+            if (secs < 129600) return '📅';
+            return '⚠️';
+        });
+
+        const isRestTimerWarning = computed(() => {
+            return elapsedSeconds.value > 129600;
+        });
+
         return { 
           showRadarInfo,
           handleRepeat,
@@ -3604,7 +3713,14 @@
           onSwipeStart,
           onSwipeMove,
           onSwipeEnd,
-          getSwipeStyle
+          getSwipeStyle,
+          // Rest Timer Banner
+          lastRecordTime,
+          restTimerDisplay,
+          restTimerUnit,
+          restTimerBannerLabel,
+          restTimerBannerIcon,
+          isRestTimerWarning
         };
       }
     });

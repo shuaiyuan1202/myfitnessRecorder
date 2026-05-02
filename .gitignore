@@ -28,6 +28,9 @@ Thumbs.db
 .trae/
 .windsurf/
 .roo/
+
+# Code Review Reports
+deepseek_codereview.md
 .history/
 
 # Vercel
@@ -63,3 +66,6 @@ logs/
 .vercel
 
 lafApi
+
+# 本地代码审查笔记
+CODE_REVIEW.md
