@@ -2288,11 +2288,12 @@
             // 4. Fetch Data
             await fetchActions();
             await fetchHistory('today');
-            fetchHistory('all');
+            await fetchHistory('all');
 
-            // Initialize rest timer banner from today's latest record
-            if (history.value.length > 0) {
-                lastRecordTime.value = history.value[0].date;
+            // Initialize rest timer banner from the latest record (all time, not just today)
+            const latest = allHistory.value.length > 0 ? allHistory.value[0].date : (history.value.length > 0 ? history.value[0].date : null);
+            if (latest) {
+                lastRecordTime.value = latest;
             }
         });
 
@@ -3596,8 +3597,8 @@
             const secs = elapsedSeconds.value;
             if (secs < 60) return '休息倒计时';
             if (secs < 3600) return '距离上组动作已过去';
-            if (secs < 86400) return '距离上次训练已过去';
-            return '距离上次动作已过去';
+            // if (secs < 86400) return '距离上次训练已过去';
+            return '距离上次训练已过去';
         });
 
         const restTimerBannerIcon = computed(() => {
