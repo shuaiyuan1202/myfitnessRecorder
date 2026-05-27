@@ -69,3 +69,4 @@ lafApi
 
 # 本地代码审查笔记
 CODE_REVIEW.md
+.env*.local
