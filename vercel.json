@@ -1,10 +1,6 @@
 {
   "framework": null,
-  "functions": {
-    "api/*.js": {
-      "regions": ["hkg1"]
-    }
-  },
+  "regions": ["hkg1"],
   "headers": [
     {
       "source": "/(.*)",

@@ -543,8 +543,8 @@
                    
                    <!-- Category Tabs -->
                    <div class="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-hide">
-                       <button 
-                           v-for="cat in categories" 
+                       <button
+                           v-for="cat in displayCategories"
                            :key="cat"
                            @click="activeCategory = cat"
                            class="btn btn-sm rounded-full transition-all border-none flex-shrink-0"
@@ -582,8 +582,9 @@
                          </div>
                       </button>
 
-                      <!-- Add Button (Weak) -->
-                      <button 
+                      <!-- Add Button (Weak, hidden for 今日 tab) -->
+                      <button
+                          v-if="activeCategory !== '今日'"
                           @click="openPreferenceModal"
                           class="flex flex-col items-center justify-center p-2 rounded-2xl border-2 border-dashed border-base-300 text-base-content/30 hover:border-primary/50 hover:text-primary transition-all h-28"
                       >
@@ -2021,6 +2022,22 @@
         // --- Preference Logic ---
         const categories = ['背', '胸', '肩', '臀腿', '核心', '手臂'];
         const activeCategory = ref('背');
+
+        // Today's trained action labels
+        const todayActionLabels = computed(() => {
+            const labels = new Set();
+            history.value.forEach(record => {
+                if (record.actionType) labels.add(record.actionType);
+            });
+            return [...labels];
+        });
+
+        const displayCategories = computed(() => {
+            if (todayActionLabels.value.length > 0) {
+                return ['今日', ...categories];
+            }
+            return categories;
+        });
         const preferredActions = ref([]); // List of action IDs
         const isPreferenceModalOpen = ref(false);
         const preferenceSaving = ref(false);
@@ -2311,6 +2328,10 @@
 
         // Computed: Actions in current category that are preferred
         const filteredPreferredActions = computed(() => {
+            if (activeCategory.value === '今日') {
+                const todayLabels = new Set(history.value.map(r => r.actionType));
+                return allActions.value.filter(a => todayLabels.has(a.label));
+            }
             return allActions.value.filter(a => {
                 const matchCategory = getCategoryMatch(a, activeCategory.value);
                 return matchCategory && preferredActions.value.includes(a.id);
@@ -3665,6 +3686,8 @@
           toggleRadarPlayback,
           // Preferences
           categories,
+          displayCategories,
+          todayActionLabels,
           activeCategory,
           filteredPreferredActions,
           openPreferenceModal,
