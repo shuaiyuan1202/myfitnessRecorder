@@ -2504,6 +2504,16 @@
             return groups;
         });
 
+        const actionMap = computed(() => {
+            const map = new Map();
+            allActions.value.forEach(a => {
+                map.set(a.name, a);
+                if (a.label && a.label !== a.name) map.set(a.label, a);
+                if (a.id && a.id !== a.name && a.id !== a.label) map.set(a.id, a);
+            });
+            return map;
+        });
+
         // Cleaned up duplicate onMounted
 
         const fetchHistory = async (range = 'today') => {
@@ -2535,7 +2545,7 @@
                             actionId = actionId[0].text;
                         }
                         
-                        const action = allActions.value.find(a => a.name === actionId || a.label === actionId || a.id === actionId);
+                        const action = actionMap.value.get(actionId);
                         
                         let kcal = fields.calories || fields.Kcal_Burned;
                         if (!kcal && action) {
@@ -2956,7 +2966,7 @@
                 const recordDate = new Date(record.date);
                 if (recordDate > now) return;
 
-                const action = allActions.value.find(a => a.label === record.actionType || a.name === record.actionType);
+                const action = actionMap.value.get(record.actionType);
                 if (!action) return;
                 
                 let muscle = '其他';
@@ -3006,7 +3016,7 @@
                 let maxScore = 0;
                 
                 last45DaysLogs.forEach(r => {
-                    const action = allActions.value.find(a => a.label === r.actionType || a.name === r.actionType);
+                    const action = actionMap.value.get(r.actionType);
                     let currentScore = 0;
 
                     if (action && action.calc_mode === 'duration') {
@@ -3109,9 +3119,7 @@
 
             if (!minDate || !maxDate) return;
 
-            const twoMonthsAgo = new Date(maxDate.getTime());
-            twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-            const startDate = minDate > twoMonthsAgo ? minDate : twoMonthsAgo;
+            const startDate = minDate;
 
             const current = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
             const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
@@ -3344,7 +3352,7 @@
         const getTodaySetsForAction = (actionName) => {
             const today = new Date().toDateString();
             return history.value.filter(record => 
-                (record.actionType === actionName || record.actionType === allActions.value.find(a => a.name === actionName)?.label) && 
+                (record.actionType === actionName || record.actionType === (actionMap.value.get(actionName)?.label)) && 
                 new Date(record.date).toDateString() === today
             ).length;
         };
@@ -3366,7 +3374,7 @@
 
         const repeatRecord = (record) => {
             // Find action
-            let action = allActions.value.find(a => a.label === record.actionType || a.name === record.actionType);
+            let action = actionMap.value.get(record.actionType);
             if (!action) return;
 
             if (navigator.vibrate) navigator.vibrate(50);
@@ -3412,7 +3420,7 @@
                  const newRecord = response.data.data;
                  const createdMs = newRecord.created_at * 1000;
                  const actionName = action.name;
-                 const actionDef = allActions.value.find(a => a.name === actionName);
+                 const actionDef = actionMap.value.get(actionName);
                  const kcal = newRecord.calories || estimatedKcal || 0;
                  
                  const localRecord = {
@@ -3556,12 +3564,12 @@
         });
 
         const getIcon = (name) => {
-          const action = allActions.value.find(a => a.label === name || a.name === name);
+          const action = actionMap.value.get(name);
           return action ? action.icon : '📝';
         };
 
         const getActionColor = (name) => {
-            const action = allActions.value.find(a => a.label === name || a.name === name);
+            const action = actionMap.value.get(name);
             return action ? action.color : 'bg-gray-100 text-gray-600';
         }
 
@@ -3570,7 +3578,7 @@
         };
 
         const formatRecordDisplay = (record) => {
-            const action = allActions.value.find(a => a.label === record.actionType || a.name === record.actionType);
+            const action = actionMap.value.get(record.actionType);
             if (action && action.calc_mode === 'duration') {
                 const seconds = parseInt(record.count);
                 if (seconds < 60) return `${seconds} <span class="text-xs font-medium text-base-content/40">秒</span>`;
