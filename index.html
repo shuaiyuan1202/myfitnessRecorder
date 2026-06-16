@@ -3791,14 +3791,16 @@
     app.use(router);
     app.mount('#app');
 
-    // 尝试锁定竖屏（仅移动端支持）
-    if (screen.orientation && screen.orientation.lock) {
-      try {
-        screen.orientation.lock('portrait');
-      } catch (e) {
-        // 静默失败，CSS 遮罩兜底
-      }
-    }
+    // 锁定竖屏（需用户手势，绑定首次触摸）
+    (function lockPortrait() {
+      if (!screen.orientation || !screen.orientation.lock) return;
+      // 立即尝试（部分浏览器允许）
+      screen.orientation.lock('portrait').catch(() => {});
+      // 首次用户交互时再试一次（Chrome Android 必须）
+      document.addEventListener('pointerdown', () => {
+        screen.orientation.lock('portrait').catch(() => {});
+      }, { once: true });
+    })();
   </script>
 </body>
 </html>
