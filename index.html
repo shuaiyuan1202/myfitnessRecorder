@@ -397,6 +397,7 @@
     }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
   </style>
 </head>
 <body class="bg-base-200/50 min-h-screen">
@@ -3789,6 +3790,15 @@
     app.use(createPinia());
     app.use(router);
     app.mount('#app');
+
+    // 尝试锁定竖屏（仅移动端支持）
+    if (screen.orientation && screen.orientation.lock) {
+      try {
+        screen.orientation.lock('portrait');
+      } catch (e) {
+        // 静默失败，CSS 遮罩兜底
+      }
+    }
   </script>
 </body>
 </html>
