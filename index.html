@@ -27,8 +27,6 @@
   <script src="./lib/pinia.iife.min.js"></script>
 
   <!-- Vercel Analytics removed — CDN unavailable in China -->
-  <!-- ECharts -->
-  <script src="./lib/echarts.min.js"></script>
   <script type="text/x-template" id="preference-selector-template">
     <div v-if="isOpen" class="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" @click="close"></div>
@@ -1835,6 +1833,21 @@
         const cardRotation = ref(0);
         const isDragging = ref(false);
         const isAnimating = ref(false); // New
+        // ECharts 懒加载
+        const echartsReady = ref(typeof echarts !== 'undefined');
+        let echartsLoading = false;
+
+        const loadEcharts = () => {
+          if (echartsReady.value || echartsLoading) return;
+          echartsLoading = true;
+          const script = document.createElement('script');
+          script.src = './lib/echarts.min.js';
+          script.onload = () => {
+            echartsReady.value = true;
+            echartsLoading = false;
+          };
+          document.head.appendChild(script);
+        };
         const isResetting = ref(false); // New
         
         // Touch handling for general swipe (removed for tabs, but kept logic vars if needed)
@@ -2415,8 +2428,13 @@
 
         const switchTab = async (tab) => {
             activeTab.value = tab;
-            if (tab === 'history' && allHistory.value.length === 0) {
-                await fetchHistory('all');
+            if (tab === 'history') {
+                if (!echartsReady.value) {
+                    loadEcharts();
+                }
+                if (allHistory.value.length === 0) {
+                    await fetchHistory('all');
+                }
             }
             if (tab === 'pump' && pumpData.value.length === 0) {
                 await fetchPumpData();
@@ -3110,17 +3128,24 @@
 
         watch(activeTab, (val) => {
              if (val === 'history') {
-                 setTimeout(() => {
-                     buildRadarSnapshots();
-                     initRadarChart();
-                 }, 100);
+                 const tryInit = () => {
+                     if (echartsReady.value) {
+                         setTimeout(() => {
+                             buildRadarSnapshots();
+                             initRadarChart();
+                         }, 100);
+                     } else {
+                         setTimeout(tryInit, 100);
+                     }
+                 };
+                 tryInit();
              } else {
                  stopRadarPlayback();
              }
         });
 
         watch(allHistory, () => {
-             if (activeTab.value === 'history') {
+             if (activeTab.value === 'history' && echartsReady.value) {
                  setTimeout(() => {
                      buildRadarSnapshots();
                      initRadarChart();
@@ -3577,7 +3602,8 @@
           restTimerUnit,
           restTimerBannerLabel,
           restTimerBannerIcon,
-          isRestTimerWarning
+          isRestTimerWarning,
+          echartsReady
         };
       }
     });
