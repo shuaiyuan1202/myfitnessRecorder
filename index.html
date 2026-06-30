@@ -22,7 +22,6 @@
   <script src="./lib/vue-demi.js"></script>
   <script src="./lib/vue-router.global.prod.js"></script>    
   <script src="./lib/axios.min.js"></script>
-  <script src="./lib/browser-image-compression.js"></script>
   <!-- Pinia -->
   <script src="./lib/pinia.iife.min.js"></script>
 
@@ -1595,9 +1594,20 @@
 
         const confirm = async () => {
           if (!imageLoaded.value || props.loading) return;
+
+          // 按需加载 browser-image-compression
           if (!window.imageCompression) {
-            alert('图片处理组件加载失败，请刷新页面重试');
-            return;
+            await new Promise((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = './lib/browser-image-compression.js';
+              script.onload = resolve;
+              script.onerror = () => reject(new Error('Failed to load image compression'));
+              document.head.appendChild(script);
+            });
+            if (!window.imageCompression) {
+              alert('图片处理组件加载失败，请刷新页面重试');
+              return;
+            }
           }
 
           const image = img.value;
@@ -2141,9 +2151,11 @@
             }
 
             // 4. Fetch Data
-            await fetchActions();
-            await fetchHistory('today');
-            await fetchHistory('all');
+            await Promise.all([
+              fetchActions(),
+              fetchHistory('today'),
+              fetchHistory('all')
+            ]);
 
             // Initialize rest timer banner from the latest record (all time, not just today)
             const latest = allHistory.value.length > 0 ? allHistory.value[0].date : (history.value.length > 0 ? history.value[0].date : null);
