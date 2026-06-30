@@ -14,9 +14,8 @@
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   
-  <!-- Tailwind & DaisyUI -->
-  <link href="./lib/full.min.css" rel="stylesheet" type="text/css" />
-  <script src="./lib/tailwindcss.js"></script>
+  <!-- Tailwind & DaisyUI (build-time purged) -->
+  <link href="./lib/fittrack.min.css" rel="stylesheet" type="text/css" />
   
   <!-- Vue 3 (Production) -->
   <script src="./lib/vue.global.prod.js"></script>
@@ -211,174 +210,6 @@
             <button class="btn btn-primary w-full rounded-2xl font-bold shadow-xl shadow-black/20" @click="editAvatar">修改头像</button>
         </div>
     </div>
-  </script>
-
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {},
-      },
-      daisyui: {
-        themes: [
-          {
-            fittrack: {
-              "primary": "#6366f1",
-              "secondary": "#ec4899",
-              "accent": "#8b5cf6",
-              "neutral": "#1f2937",
-              "base-100": "#ffffff",
-              "base-200": "#f3f4f6",
-              "base-300": "#e5e7eb",
-              "info": "#3abff8",
-              "success": "#36d399",
-              "warning": "#fbbd23",
-              "error": "#f87272",
-              "--rounded-box": "1rem",
-              "--rounded-btn": "0.8rem",
-              "--rounded-badge": "1.9rem",
-              "--animation-btn": "0.25s",
-              "--animation-input": "0.2s",
-              "--btn-focus-scale": "0.95",
-              "--border-btn": "1px",
-              "--tab-border": "1px",
-              "--tab-radius": "0.5rem",
-            },
-            red: {
-              "primary": "#ef4444",
-              "secondary": "#f87171",
-              "accent": "#b91c1c",
-              "neutral": "#1f2937",
-              "base-100": "#ffffff",
-              "base-200": "#fef2f2",
-              "base-300": "#fee2e2",
-              "info": "#3abff8",
-              "success": "#36d399",
-              "warning": "#fbbd23",
-              "error": "#f87272",
-              "--rounded-box": "1rem",
-              "--rounded-btn": "0.8rem",
-              "--rounded-badge": "1.9rem",
-              "--animation-btn": "0.25s",
-              "--animation-input": "0.2s",
-              "--btn-focus-scale": "0.95",
-              "--border-btn": "1px",
-              "--tab-border": "1px",
-              "--tab-radius": "0.5rem",
-            },
-            black: {
-              "primary": "#1f2937",
-              "secondary": "#374151",
-              "accent": "#000000",
-              "neutral": "#111827",
-              "base-100": "#ffffff",
-              "base-200": "#f3f4f6",
-              "base-300": "#e5e7eb",
-              "info": "#3abff8",
-              "success": "#36d399",
-              "warning": "#fbbd23",
-              "error": "#f87272",
-              "--rounded-box": "1rem",
-              "--rounded-btn": "0.8rem",
-              "--rounded-badge": "1.9rem",
-              "--animation-btn": "0.25s",
-              "--animation-input": "0.2s",
-              "--btn-focus-scale": "0.95",
-              "--border-btn": "1px",
-              "--tab-border": "1px",
-              "--tab-radius": "0.5rem",
-            },
-            green: {
-              "primary": "#10b981",
-              "secondary": "#34d399",
-              "accent": "#059669",
-              "neutral": "#1f2937",
-              "base-100": "#ffffff",
-              "base-200": "#ecfdf5",
-              "base-300": "#d1fae5",
-              "info": "#3abff8",
-              "success": "#36d399",
-              "warning": "#fbbd23",
-              "error": "#f87272",
-              "--rounded-box": "1rem",
-              "--rounded-btn": "0.8rem",
-              "--rounded-badge": "1.9rem",
-              "--animation-btn": "0.25s",
-              "--animation-input": "0.2s",
-              "--btn-focus-scale": "0.95",
-              "--border-btn": "1px",
-              "--tab-border": "1px",
-              "--tab-radius": "0.5rem",
-            },
-            blue: {
-              "primary": "#3b82f6",
-              "secondary": "#60a5fa",
-              "accent": "#2563eb",
-              "neutral": "#1f2937",
-              "base-100": "#ffffff",
-              "base-200": "#eff6ff",
-              "base-300": "#dbeafe",
-              "info": "#3abff8",
-              "success": "#36d399",
-              "warning": "#fbbd23",
-              "error": "#f87272",
-              "--rounded-box": "1rem",
-              "--rounded-btn": "0.8rem",
-              "--rounded-badge": "1.9rem",
-              "--animation-btn": "0.25s",
-              "--animation-input": "0.2s",
-              "--btn-focus-scale": "0.95",
-              "--border-btn": "1px",
-              "--tab-border": "1px",
-              "--tab-radius": "0.5rem",
-            },
-            orange: {
-              "primary": "#f97316",
-              "secondary": "#fb923c",
-              "accent": "#ea580c",
-              "neutral": "#1f2937",
-              "base-100": "#ffffff",
-              "base-200": "#fff7ed",
-              "base-300": "#ffedd5",
-              "info": "#3abff8",
-              "success": "#36d399",
-              "warning": "#fbbd23",
-              "error": "#f87272",
-              "--rounded-box": "1rem",
-              "--rounded-btn": "0.8rem",
-              "--rounded-badge": "1.9rem",
-              "--animation-btn": "0.25s",
-              "--animation-input": "0.2s",
-              "--btn-focus-scale": "0.95",
-              "--border-btn": "1px",
-              "--tab-border": "1px",
-              "--tab-radius": "0.5rem",
-            },
-            cyan: {
-              "primary": "#06b6d4",
-              "secondary": "#22d3ee",
-              "accent": "#0891b2",
-              "neutral": "#1f2937",
-              "base-100": "#ffffff",
-              "base-200": "#ecfeff",
-              "base-300": "#cffafe",
-              "info": "#3abff8",
-              "success": "#36d399",
-              "warning": "#fbbd23",
-              "error": "#f87272",
-              "--rounded-box": "1rem",
-              "--rounded-btn": "0.8rem",
-              "--rounded-badge": "1.9rem",
-              "--animation-btn": "0.25s",
-              "--animation-input": "0.2s",
-              "--btn-focus-scale": "0.95",
-              "--border-btn": "1px",
-              "--tab-border": "1px",
-              "--tab-radius": "0.5rem",
-            },
-          },
-        ],
-      },
-    }
   </script>
 
   <!-- Libraries removed (duplicates) -->
@@ -3791,14 +3622,23 @@
     app.use(router);
     app.mount('#app');
 
-    // 锁定竖屏（需用户手势，绑定首次触摸）
+    // 锁定竖屏 — Chrome Android 需要先进入全屏
     (function lockPortrait() {
       if (!screen.orientation || !screen.orientation.lock) return;
-      // 立即尝试（部分浏览器允许）
+      // 立即尝试（部分浏览器直接支持）
       screen.orientation.lock('portrait').catch(() => {});
-      // 首次用户交互时再试一次（Chrome Android 必须）
-      document.addEventListener('pointerdown', () => {
-        screen.orientation.lock('portrait').catch(() => {});
+      // 首次触摸时：进入全屏 → 锁定向 → 退出全屏
+      document.addEventListener('pointerdown', async () => {
+        try {
+          // Chrome Android 必须从 fullscreen 才能 lock
+          const el = document.documentElement;
+          const fsFn = el.requestFullscreen || el.webkitRequestFullscreen;
+          if (fsFn) await fsFn.call(el);
+          await screen.orientation.lock('portrait');
+          // 锁定后立即退出全屏
+          const exitFs = document.exitFullscreen || document.webkitExitFullscreen;
+          if (exitFs) exitFs.call(document);
+        } catch (e) { /* 某些浏览器不支持，忽略 */ }
       }, { once: true });
     })();
   </script>

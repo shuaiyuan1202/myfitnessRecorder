@@ -8,6 +8,8 @@
     "deploy": "vercel deploy --prod"
   },
   "devDependencies": {
+    "daisyui": "^4.12.24",
+    "tailwindcss": "^3.4.19",
     "vercel": "^33.0.0"
   },
   "dependencies": {
