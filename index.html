@@ -2927,10 +2927,9 @@
 
         const initTrendChart = () => {
             if (!trendContainer.value || monthlyStats.value.length === 0) return;
-            if (!trendChart) {
-                trendChart = echarts.init(trendContainer.value);
-                window.addEventListener('resize', () => trendChart && trendChart.resize());
-            }
+            if (trendChart) trendChart.dispose();
+            trendChart = echarts.init(trendContainer.value);
+            window.addEventListener('resize', () => trendChart && trendChart.resize());
             renderTrendChart();
         };
 
