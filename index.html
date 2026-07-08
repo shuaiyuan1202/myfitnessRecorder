@@ -513,8 +513,8 @@
 
                 <div v-else class="overflow-hidden">
                     <!-- History Heatmap View -->
-                    <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 overflow-hidden mb-6" style="overflow: visible !important;">
-                        <div class="overflow-x-auto pb-2 scrollbar-hide" style="direction: rtl; overflow: visible !important;">
+                    <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100 overflow-hidden mb-6">
+                        <div class="overflow-x-auto pb-2 scrollbar-hide" style="direction: rtl;">
                             <!-- Grid Container (Reversed direction for RTL to start from right) -->
                             <div class="grid grid-rows-9 grid-flow-col gap-1 w-max ltr" style="direction: ltr;">
                                <div 
@@ -524,10 +524,12 @@
                                   :class="cell.type === 'day' ? 'w-3 h-3 rounded-[2px] transition-colors hover:ring-2 ring-primary/50 group cursor-pointer' : (cell.type === 'month' ? 'w-3 h-4 flex items-center justify-center overflow-hidden' : 'w-3 h-4 flex items-center justify-center overflow-visible')"
                                >
                                   <template v-if="cell.type === 'day'">
-                                      <div class="w-3 h-3 rounded-[2px] transition-colors" :class="[cell.color, {'invisible': cell.invisible}]"></div>
-                                      <div v-if="!cell.invisible" class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
-                                          {{ cell.dateLabel }}: {{ cell.count }} 组
-                                      </div>
+                                      <div
+                                          class="w-3 h-3 rounded-[2px] transition-colors"
+                                          :class="[cell.color, {'invisible': cell.invisible}]"
+                                          @mouseenter="!cell.invisible && showHeatmapTooltip($event, cell)"
+                                          @mouseleave="hideHeatmapTooltip"
+                                      ></div>
                                   </template>
 
                                   <template v-else-if="cell.type === 'month'">
@@ -565,15 +567,45 @@
                         </div>
                     </div>
 
-                    <!-- Stats Card -->
-                    <div class="p-5 bg-gradient-to-br from-base-100 to-base-200 rounded-3xl border border-base-100 shadow-sm mb-6">
-                        <div class="flex items-center gap-3 mb-2">
-                            <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">📊</div>
-                            <h4 class="font-bold text-base-content/80">本月统计</h4>
+                    <!-- Monthly Stats Section -->
+                    <div class="mb-6">
+                        <!-- 3 Key Metric Cards -->
+                        <div class="grid grid-cols-3 gap-3 mb-4">
+                            <div class="bg-base-100 rounded-2xl p-3 shadow-sm border border-base-100 text-center">
+                                <div class="text-2xl font-black text-primary">{{ thisMonthStats ? thisMonthStats.sets : '-' }}</div>
+                                <div class="text-[10px] text-base-content/50 mt-0.5">本月组数</div>
+                                <div v-if="thisMonthStats && thisMonthStats.setsChange !== null" class="text-[10px] mt-1 font-semibold" :class="thisMonthStats.setsChange >= 0 ? 'text-green-500' : 'text-red-400'">
+                                    {{ thisMonthStats.setsChange >= 0 ? '▲' : '▼' }} {{ Math.abs(thisMonthStats.setsChange) }}%
+                                </div>
+                                <div v-else class="text-[10px] mt-1 text-base-content/30">较上月</div>
+                            </div>
+                            <div class="bg-base-100 rounded-2xl p-3 shadow-sm border border-base-100 text-center">
+                                <div class="text-2xl font-black text-secondary">{{ thisMonthStats ? thisMonthStats.activeDays : '-' }}</div>
+                                <div class="text-[10px] text-base-content/50 mt-0.5">活跃天数</div>
+                                <div class="text-[10px] mt-1 text-base-content/30">天 / 本月</div>
+                            </div>
+                            <div class="bg-base-100 rounded-2xl p-3 shadow-sm border border-base-100 text-center">
+                                <div class="text-xl font-black text-accent">{{ thisMonthStats ? thisMonthStats.calories : '-' }}</div>
+                                <div class="text-[10px] text-base-content/50 mt-0.5">消耗热量</div>
+                                <div class="text-[10px] mt-1 text-base-content/30">kcal</div>
+                            </div>
                         </div>
-                        <p class="text-base-content font-medium leading-relaxed">
-                            {{ historyStatsText }}
-                        </p>
+
+                        <!-- Monthly Trend Chart -->
+                        <div class="bg-base-100 p-4 rounded-3xl shadow-sm border border-base-100">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm">📈</div>
+                                    <h4 class="font-bold text-base-content/80 text-sm">月度趋势</h4>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button @click="trendMetric = 'sets'" class="btn btn-xs rounded-full px-2" :class="trendMetric === 'sets' ? 'btn-primary' : 'btn-ghost text-base-content/40'">组数</button>
+                                    <button @click="trendMetric = 'activeDays'" class="btn btn-xs rounded-full px-2" :class="trendMetric === 'activeDays' ? 'btn-primary' : 'btn-ghost text-base-content/40'">天数</button>
+                                    <button @click="trendMetric = 'calories'" class="btn btn-xs rounded-full px-2" :class="trendMetric === 'calories' ? 'btn-primary' : 'btn-ghost text-base-content/40'">热量</button>
+                                </div>
+                            </div>
+                            <div ref="trendContainer" class="w-full h-48"></div>
+                        </div>
                     </div>
 
                     <!-- Radar Chart -->
@@ -830,6 +862,15 @@
             @close="isDeleteModalOpen = false"
             @confirm="confirmDelete"
         ></delete-confirmation-modal>
+
+        <!-- Global heatmap tooltip (fixed, escapes all overflow contexts) -->
+        <div
+            v-if="heatmapTooltip"
+            class="fixed z-50 px-2 py-1 bg-gray-800 text-white text-xs rounded pointer-events-none whitespace-nowrap -translate-x-1/2"
+            :style="{ left: heatmapTooltip.x + 'px', top: heatmapTooltip.y + 'px' }"
+        >
+            {{ heatmapTooltip.text }}
+        </div>
     </div>
   </script>
 
@@ -2670,15 +2711,14 @@
 
         const heatmapData = computed(() => {
              if (allHistory.value.length === 0) return [];
-             
-             // Generate last 365 days
+
              const days = [];
              const today = new Date();
-             const oneYearAgo = new Date();
-             oneYearAgo.setDate(today.getDate() - 364);
-             
-             // Pad start to align with day of week (assuming Row 1 is Sunday)
-             const startDay = oneYearAgo.getDay(); // 0-6
+             // Fixed start: October 1, 2025 (first workout month)
+             const startDate = new Date(2025, 9, 1);
+
+             // Pad start to align with day of week (Sunday = 0)
+             const startDay = startDate.getDay();
              for (let i = 0; i < startDay; i++) {
                  days.push({ dateLabel: '', dateObj: null, count: 0, color: 'bg-transparent', invisible: true });
              }
@@ -2690,8 +2730,8 @@
                  if (!activityMap[dateStr]) activityMap[dateStr] = 0;
                  activityMap[dateStr]++;
              });
- 
-             for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
+
+             for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
                  const dateStr = d.toDateString();
                  const count = activityMap[dateStr] || 0;
                  let color = 'bg-base-200'; // default gray
@@ -2778,6 +2818,121 @@
 
             return `本月共运动 ${uniqueDays} 天，完成运动 ${totalSets} 组`;
         });
+
+        // --- Heatmap Tooltip ---
+        const heatmapTooltip = ref(null);
+        const showHeatmapTooltip = (event, cell) => {
+            const rect = event.target.getBoundingClientRect();
+            heatmapTooltip.value = {
+                text: `${cell.dateLabel}: ${cell.count} 组`,
+                x: rect.left + rect.width / 2,
+                y: rect.top - 8,
+            };
+        };
+        const hideHeatmapTooltip = () => { heatmapTooltip.value = null; };
+
+        // --- Monthly Trend Chart ---
+        const trendMetric = ref('sets');
+        const trendContainer = ref(null);
+        let trendChart = null;
+
+        const monthlyStats = computed(() => {
+            if (allHistory.value.length === 0) return [];
+            const start = new Date(2025, 9, 1);
+            const now = new Date();
+            const result = [];
+            const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+            while (cur <= now) {
+                const y = cur.getFullYear();
+                const m = cur.getMonth();
+                const records = allHistory.value.filter(r => {
+                    const d = new Date(r.date);
+                    return d.getFullYear() === y && d.getMonth() === m;
+                });
+                result.push({
+                    label: `${m + 1}月`,
+                    year: y,
+                    month: m,
+                    sets: records.length,
+                    activeDays: new Set(records.map(r => new Date(r.date).toDateString())).size,
+                    calories: Math.round(records.reduce((s, r) => s + (r.kcal || 0), 0)),
+                });
+                cur.setMonth(cur.getMonth() + 1);
+            }
+            return result;
+        });
+
+        const thisMonthStats = computed(() => {
+            const stats = monthlyStats.value;
+            if (!stats.length) return null;
+            const cur = stats[stats.length - 1];
+            const prev = stats.length >= 2 ? stats[stats.length - 2] : null;
+            const setsChange = prev && prev.sets > 0
+                ? Math.round((cur.sets - prev.sets) / prev.sets * 100)
+                : null;
+            return { sets: cur.sets, activeDays: cur.activeDays, calories: cur.calories, setsChange };
+        });
+
+        const renderTrendChart = () => {
+            if (!trendChart || monthlyStats.value.length === 0) return;
+            const data = monthlyStats.value;
+            const key = trendMetric.value;
+            const values = data.map(m => m[key]);
+            const labels = data.map(m => m.label);
+            const activeValues = values.filter(v => v > 0);
+            const avg = activeValues.length > 0
+                ? Math.round(activeValues.reduce((a, b) => a + b, 0) / activeValues.length)
+                : 0;
+            trendChart.setOption({
+                animation: false,
+                grid: { left: 36, right: 12, top: 12, bottom: 36 },
+                xAxis: {
+                    type: 'category',
+                    data: labels,
+                    axisLabel: { fontSize: 10, color: '#9ca3af' },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                },
+                yAxis: {
+                    type: 'value',
+                    minInterval: 1,
+                    axisLabel: { fontSize: 10, color: '#9ca3af' },
+                    splitLine: { lineStyle: { color: '#f3f4f6', type: 'dashed' } },
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                },
+                series: [
+                    {
+                        type: 'bar',
+                        data: values,
+                        barMaxWidth: 28,
+                        itemStyle: { color: '#6366f1', borderRadius: [4, 4, 0, 0] },
+                        markLine: {
+                            silent: true,
+                            symbol: 'none',
+                            data: [{ yAxis: avg }],
+                            lineStyle: { color: '#f59e0b', type: 'dashed', width: 1.5 },
+                            label: {
+                                formatter: `月均 ${avg}`,
+                                position: 'insideEndTop',
+                                fontSize: 10,
+                                color: '#f59e0b',
+                                fontWeight: 'bold',
+                            },
+                        },
+                    }
+                ]
+            }, true);
+        };
+
+        const initTrendChart = () => {
+            if (!trendContainer.value || monthlyStats.value.length === 0) return;
+            if (!trendChart) {
+                trendChart = echarts.init(trendContainer.value);
+                window.addEventListener('resize', () => trendChart && trendChart.resize());
+            }
+            renderTrendChart();
+        };
 
         // --- Radar Info State ---
         const showRadarInfo = ref(false);
@@ -3145,6 +3300,7 @@
                          setTimeout(() => {
                              buildRadarSnapshots();
                              initRadarChart();
+                             initTrendChart();
                          }, 100);
                      } else {
                          setTimeout(tryInit, 100);
@@ -3161,8 +3317,13 @@
                  setTimeout(() => {
                      buildRadarSnapshots();
                      initRadarChart();
+                     initTrendChart();
                  }, 100);
              }
+        });
+
+        watch(trendMetric, () => {
+            renderTrendChart();
         });
 
         const todayRecords = computed(() => {
@@ -3544,7 +3705,14 @@
           heatmapData,
           heatmapGridCells,
           historyStatsText,
+          heatmapTooltip,
+          showHeatmapTooltip,
+          hideHeatmapTooltip,
           allHistory,
+          monthlyStats,
+          thisMonthStats,
+          trendMetric,
+          trendContainer,
           historyLoading, // Added this
           historyError,
           fetchHistory,

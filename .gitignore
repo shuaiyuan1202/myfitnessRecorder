@@ -70,3 +70,6 @@ lafApi
 # 本地代码审查笔记
 CODE_REVIEW.md
 .env*.local
+
+# 本地功能设计笔记
+FEATURE_*.md
