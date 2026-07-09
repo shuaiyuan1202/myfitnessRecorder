@@ -3033,19 +3033,33 @@
                          const seconds = parseFloat(r.count || 0);
                          currentScore = Math.min((seconds / 120) * 100, 120);
                     } else {
-                         // 1RM Logic
-                         const w = parseFloat(r.weight || 0);
+                         // 1RM Logic (weighted or bodyweight)
+                         let w = parseFloat(r.weight || 0);
                          const reps = parseFloat(r.count || 0);
+                         if (w === 0 && action && action.calc_mode === 'bodyweight' && reps > 0) {
+                            // Use bodyweight percentage as effective load
+                            let bwFactor = 0.65;
+                            if (muscle === '背') bwFactor = 0.85;
+                            else if (muscle === '腿') bwFactor = 1.0;
+                            else if (muscle === '肩') bwFactor = 0.55;
+                            else if (muscle === '核心') bwFactor = 0.30;
+                            // Ab wheel is significantly harder than regular core exercises
+                            const actionName = (action.name || '').toLowerCase();
+                            if (actionName.includes('ab_wheel')) {
+                                bwFactor = actionName.includes('standing') ? 0.80 : 0.50;
+                            }
+                            w = userWeight * bwFactor;
+                         }
                          if (w > 0 && reps > 0) {
                             const est1RM = w * (1 + reps / 30);
                             const ratio = est1RM / userWeight;
-                            
+
                             let kStd = 1.0;
                             if (muscle === '胸') kStd = 1.5;
-                            else if (muscle === '背') kStd = 2.0; 
+                            else if (muscle === '背') kStd = 2.0;
                             else if (muscle === '腿') kStd = 1.6;
                             else if (muscle === '肩') kStd = 0.9;
-                            
+
                             currentScore = Math.min((ratio / kStd) * 100, 120);
                          }
                     }
